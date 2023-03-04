@@ -3,9 +3,13 @@ package netease
 import (
 	"fmt"
 	"log"
+	"os"
+	"time"
 
 	"github.com/buger/jsonparser"
 	"github.com/imroc/req/v3"
+	"github.com/mdp/qrterminal/v3"
+	cookiejar "github.com/orirawlings/persistent-cookiejar"
 )
 
 type NeteaseClient struct {
@@ -16,7 +20,14 @@ type NeteaseClient struct {
 var Client = NewNeteaseClient()
 
 func NewNeteaseClient() *NeteaseClient {
+	jar, err := cookiejar.New(&cookiejar.Options{
+		Filename: "cookies.json",
+	})
+	if err != nil {
+		log.Fatalf("failed to create persistent cookiejar: %s\n", err.Error())
+	}
 	c := req.C().
+		SetCookieJar(jar).
 		//SetCommonHeader("Accept-Language", "zh-CN, zh-TW, en-US").
 		//SetCommonHeader("Accept", "application/json").
 		//SetCommonHeader("Content-Type", "application/json").
@@ -33,7 +44,6 @@ func NewNeteaseClient() *NeteaseClient {
 			}
 			if r.RawURL[0:5] == "weapi" {
 				//需要加密
-				fmt.Println(string(r.Body))
 				params, encSecKey, encErr := Encrypt(string(r.Body))
 				if encErr != nil {
 					log.Println(encErr)
@@ -57,9 +67,15 @@ func NewNeteaseClient() *NeteaseClient {
 			if err != nil {
 				log.Panic(err)
 			}
-			if code != 200 {
+			if (code != 200) && (code < 800 || code > 803) {
 				msg, _ := jsonparser.GetString(resp.Bytes(), "message")
 				return fmt.Errorf("Netease API Error: %s", msg)
+			}
+			if code == 803 {
+				err := jar.Save()
+				if err != nil {
+					log.Println(err)
+				}
 			}
 			return nil
 		})
@@ -83,10 +99,63 @@ func Demo3(id int64) {
 	nsm.ChangeTransOrder()
 	fmt.Print(nsm.lyric.GetLyrics())
 }
-func Demo5() {
+func Demo4(id int64) {
+	nsm := NewNeteaseAlbum(id)
+	//nsm.lyric.DelayLyricLine(0, 500)
+	fmt.Println(nsm)
+}
+func Login() {
 	resp, err := Client.R().SetBodyString(`{"type":1}`).Post(`weapi/login/qrcode/unikey`)
 	if err != nil {
 		log.Println(err.Error())
 	}
-	log.Println(resp)
+	unikey, err := jsonparser.GetString(resp.Bytes(), "unikey")
+	if err != nil {
+		log.Panic(err)
+	}
+
+	config := qrterminal.Config{
+		Level:     qrterminal.L,
+		Writer:    os.Stdout,
+		BlackChar: qrterminal.BLACK,
+		WhiteChar: qrterminal.WHITE,
+		QuietZone: 1,
+	}
+	qrterminal.GenerateWithConfig("https://music.163.com/login?codekey="+unikey, config)
+
+	for {
+		time.Sleep(time.Duration(3) * time.Second)
+		resp, err = Client.R().SetBodyString(`{"key":"` + unikey + `","type":1}`).Post(`weapi/login/qrcode/client/login`)
+		if err != nil {
+			log.Println(err.Error())
+		}
+		code, _ := jsonparser.GetInt(resp.Bytes(), "code")
+		if code == 801 || code == 802 {
+			fmt.Print("...")
+		} else if code == 803 {
+			fmt.Println("登录成功")
+			break
+		} else if code == 800 {
+			fmt.Println("用户拒绝登录")
+			break
+		}
+	}
+	//log.Println(resp)
+}
+
+// 检测登录状态。用户名 (ID), 是否登录
+func checkLogin() (string, bool) {
+	resp, err := Client.R().SetBodyString(`{}`).Post(`weapi/w/nuser/account/get`)
+	if err != nil {
+		log.Println(err.Error())
+	}
+	nickname, err := jsonparser.GetString(resp.Bytes(), "profile", "nickname")
+	if err != nil {
+		return "未登录", false
+	}
+	userId, err := jsonparser.GetInt(resp.Bytes(), "profile", "userId")
+	if err != nil {
+		return "未登录", false
+	}
+	return fmt.Sprintf("%s (%d)", nickname, userId), true
 }
