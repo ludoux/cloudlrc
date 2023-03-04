@@ -9,6 +9,7 @@ import (
 	"github.com/spf13/cast"
 )
 
+// 单曲相关
 type NeteaseSingleMusic_s struct {
 	no      int
 	id      int64
@@ -27,10 +28,13 @@ func NewNeteaseSingleMusic(id int64) *NeteaseSingleMusic_s {
 	rt.fetch()
 	rt.fetchLrc()
 	return &rt
-} /*
+}
 func NewNeteaseSingleMusicNofetch(id int64) *NeteaseSingleMusic_s {
+	rt := NeteaseSingleMusic_s{id: id}
+	rt.lyric = lyric.NewLyric()
+	return &rt
+}
 
-}*/
 func (it *NeteaseSingleMusic_s) fetch() {
 	resp, err := Client.R().Get(`api/v3/song/detail?c=[{"id":"` + cast.ToString(it.id) + `"}]`)
 	if err != nil {
@@ -128,4 +132,62 @@ func (it *NeteaseSingleMusic_s) fetchLrc() {
 // 调换原文和翻译的优先级
 func (it *NeteaseSingleMusic_s) ChangeTransOrder() {
 	it.lyric.SwapPriority(0, 1)
+}
+
+// 专辑相关
+type NeteaseSingleMusics_t []*NeteaseSingleMusic_s
+type NeteaseAlbum_s struct {
+	id     int64
+	title  string
+	musics NeteaseSingleMusics_t
+}
+
+func NewNeteaseAlbum(id int64) *NeteaseAlbum_s {
+	rt := NeteaseAlbum_s{id: id}
+	rt.fetch()
+	return &rt
+}
+
+func (it *NeteaseAlbum_s) fetch() {
+	resp, err := Client.R().Get(`api/album/` + cast.ToString(it.id))
+	if err != nil {
+		log.Println(err.Error())
+	}
+	value, err := jsonparser.GetString(resp.Bytes(), "album", "name")
+	if err != nil {
+		log.Panic(err)
+	}
+	it.title = value
+
+	//遍历内部的歌曲
+	jsonparser.ArrayEach(resp.Bytes(), func(value []byte, dataType jsonparser.ValueType, offset int, err error) {
+		musicId, err := jsonparser.GetInt(value, "id")
+		if err != nil {
+			log.Panic(err)
+		}
+		newMusic := NewNeteaseSingleMusicNofetch(musicId)
+		name, err := jsonparser.GetString(value, "name")
+		if err != nil {
+			log.Panic(err)
+		}
+		newMusic.title = name
+
+		valueInt, err := jsonparser.GetInt(value, "no")
+		if err != nil {
+			log.Panic(err)
+		}
+		newMusic.no = cast.ToInt(valueInt)
+
+		newMusic.album = it.title
+
+		jsonparser.ArrayEach(value, func(inValue []byte, dataType jsonparser.ValueType, offset int, err error) {
+			artist, err := jsonparser.GetString(inValue, "name")
+			if err != nil {
+				log.Panic(err)
+			}
+			newMusic.artists = append(newMusic.artists, artist)
+		}, "artists")
+
+		it.musics = append(it.musics, newMusic)
+	}, "album", "songs")
 }
