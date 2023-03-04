@@ -40,6 +40,10 @@ func NewLyric() *Lyric_s {
 	return &rt
 }
 
+func (it *LyricLine_s) getPriority() int {
+	return it.priority
+}
+
 func (it *LyricLine_s) setPriority(value int) error {
 	it.priority = value
 	return nil
@@ -141,9 +145,29 @@ func (it *LyricLine_s) GetTimeStringNoBrackets() string {
 	return fmt.Sprintf("%d:%2d:%2d.%.3d", it.time_hr, it.time_min, it.time_sec, it.time_ms)
 }
 
-func (it *LyricLine_s) getTimeLineInMs() int64 {
+func (it *LyricLine_s) getTimelineInMs() int64 {
 	total := cast.ToInt64(it.time_ms) + cast.ToInt64(it.time_sec)*1000 + cast.ToInt64(it.time_min)*60000 + cast.ToInt64(it.time_hr)*3600000
 	return total
+}
+
+func divmod64(x int64, y int64) (int, int) {
+	return cast.ToInt(x / y), cast.ToInt(x % y)
+}
+
+func divmod(x int, y int) (int, int) {
+	return x / y, x % y
+}
+
+// 给定总ms,重新分配timeline属性
+func (it *LyricLine_s) setTimelineFromMs(ms int64) {
+	it.time_sec, it.time_ms = divmod64(ms, 1000)
+	it.time_min, it.time_sec = divmod(it.time_sec, 60)
+	it.time_hr, it.time_min = divmod(it.time_min, 60)
+}
+
+// 输入 ms 单位的偏移量（如1000指延后1s
+func (it *LyricLine_s) adjustTimelineMs(ms int64) {
+	it.setTimelineFromMs(it.getTimelineInMs() + ms)
 }
 
 func (it LyricLines_t) Len() int {
@@ -155,8 +179,8 @@ func (it LyricLines_t) Less(i, j int) bool {
 	//若a<b,返回true,指a在后出现
 	a := it[i]
 	b := it[j]
-	aInMs := a.getTimeLineInMs()
-	bInMs := b.getTimeLineInMs()
+	aInMs := a.getTimelineInMs()
+	bInMs := b.getTimelineInMs()
 
 	if a.is_tag && !b.is_tag {
 		return false
@@ -209,4 +233,23 @@ func (it *Lyric_s) GetLyrics() string {
 		build.WriteString("\n")
 	}
 	return build.String()
+}
+
+// 为指定priority的歌词行调整
+func (it *Lyric_s) DelayLyricLine(priority int, ms int64) {
+	for _, val := range it.lyricLines {
+		if val.getPriority() == priority {
+			val.adjustTimelineMs(ms)
+		}
+	}
+}
+
+func (it *Lyric_s) SwapPriority(a, b int) {
+	for _, val := range it.lyricLines {
+		if val.getPriority() == a {
+			val.setPriority(b)
+		} else if val.getPriority() == b {
+			val.setPriority(a)
+		}
+	}
 }

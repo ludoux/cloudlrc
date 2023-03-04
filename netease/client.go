@@ -57,5 +57,8 @@ func Demo2() {
 }
 
 func Demo3(id int64) {
-	fmt.Print(NewNeteaseSingleMusic(id).lyric.GetLyrics())
+	nsm := NewNeteaseSingleMusic(id)
+	//nsm.lyric.DelayLyricLine(0, 500)
+	nsm.ChangeTransOrder()
+	fmt.Print(nsm.lyric.GetLyrics())
 }

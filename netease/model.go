@@ -21,6 +21,16 @@ type NeteaseSingleMusic_s struct {
 	lyric   *lyric.Lyric_s
 }
 
+func NewNeteaseSingleMusic(id int64) *NeteaseSingleMusic_s {
+	rt := NeteaseSingleMusic_s{id: id}
+	rt.lyric = lyric.NewLyric()
+	rt.fetch()
+	rt.fetchLrc()
+	return &rt
+} /*
+func NewNeteaseSingleMusicNofetch(id int64) *NeteaseSingleMusic_s {
+
+}*/
 func (it *NeteaseSingleMusic_s) fetch() {
 	resp, err := Client.R().Get(`v3/song/detail?c=[{"id":"` + cast.ToString(it.id) + `"}]`)
 	if err != nil {
@@ -88,6 +98,7 @@ func (it *NeteaseSingleMusic_s) fetchLrc() {
 
 	txtLines := strings.Split(value, "\n")
 	for _, val := range txtLines {
+		//原文歌词的优先级更高
 		it.lyric.AppendLyricTextLine(val, 1)
 	}
 
@@ -109,16 +120,12 @@ func (it *NeteaseSingleMusic_s) fetchLrc() {
 
 	txtLines = strings.Split(value, "\n")
 	for _, val := range txtLines {
+		//译文优先级较低
 		it.lyric.AppendLyricTextLine(val, 0)
 	}
 }
-func NewNeteaseSingleMusic(id int64) *NeteaseSingleMusic_s {
-	rt := NeteaseSingleMusic_s{id: id}
-	rt.lyric = lyric.NewLyric()
-	rt.fetch()
-	rt.fetchLrc()
-	return &rt
-} /*
-func NewNeteaseSingleMusicNofetch(id int64) *NeteaseSingleMusic_s {
 
-}*/
+// 调换原文和翻译的优先级
+func (it *NeteaseSingleMusic_s) ChangeTransOrder() {
+	it.lyric.SwapPriority(0, 1)
+}
