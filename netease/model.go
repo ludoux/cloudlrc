@@ -12,7 +12,7 @@ import (
 type NeteaseSingleMusic_s struct {
 	no      int
 	id      int64
-	titile  string
+	title   string
 	artists []string
 	album   string
 	retry   int
