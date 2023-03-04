@@ -32,7 +32,7 @@ func NewNeteaseSingleMusicNofetch(id int64) *NeteaseSingleMusic_s {
 
 }*/
 func (it *NeteaseSingleMusic_s) fetch() {
-	resp, err := Client.R().Get(`v3/song/detail?c=[{"id":"` + cast.ToString(it.id) + `"}]`)
+	resp, err := Client.R().Get(`api/v3/song/detail?c=[{"id":"` + cast.ToString(it.id) + `"}]`)
 	if err != nil {
 		log.Println(err.Error())
 	}
@@ -41,7 +41,7 @@ func (it *NeteaseSingleMusic_s) fetch() {
 	if err != nil {
 		log.Panic(err)
 	}
-	it.titile = value
+	it.title = value
 
 	valueInt, err := jsonparser.GetInt(resp.Bytes(), "songs", "[0]", "no")
 	if err != nil {
@@ -66,7 +66,7 @@ func (it *NeteaseSingleMusic_s) fetch() {
 
 func (it *NeteaseSingleMusic_s) fetchLrc() {
 	//获取原文歌词
-	resp, err := Client.R().Get(`song/media?id=` + cast.ToString(it.id))
+	resp, err := Client.R().Get(`api/song/media?id=` + cast.ToString(it.id))
 	if err != nil {
 		log.Println(err.Error())
 	}
@@ -103,7 +103,7 @@ func (it *NeteaseSingleMusic_s) fetchLrc() {
 	}
 
 	//===后面翻译
-	resp, err = Client.R().Get(`song/lyric?os=pc&id=` + cast.ToString(it.id) + `&tv=-1`)
+	resp, err = Client.R().Get(`api/song/lyric?os=pc&id=` + cast.ToString(it.id) + `&tv=-1`)
 	if err != nil {
 		log.Println(err.Error())
 	}
