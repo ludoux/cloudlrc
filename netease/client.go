@@ -104,6 +104,11 @@ func Demo4(id int64) {
 	//nsm.lyric.DelayLyricLine(0, 500)
 	fmt.Println(nsm)
 }
+
+func Demo5(id int64) {
+	nnp := NewNeteasePlaylist(id)
+	fmt.Println(nnp)
+}
 func Login() {
 	resp, err := Client.R().SetBodyString(`{"type":1}`).Post(`weapi/login/qrcode/unikey`)
 	if err != nil {

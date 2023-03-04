@@ -1,6 +1,7 @@
 package netease
 
 import (
+	"fmt"
 	"log"
 	"strings"
 
@@ -11,28 +12,59 @@ import (
 
 // 单曲相关
 type NeteaseSingleMusic_s struct {
-	no      int
-	id      int64
-	title   string
-	artists []string
-	album   string
-	retry   int
-	status  int
-	msg     string
-	lyric   *lyric.Lyric_s
+	no           int
+	id           int64
+	title        string
+	artists      []string
+	album        string
+	retry        int
+	listI        int //从0开始
+	needDownload bool
+	status       int
+	msg          string
+	lyric        *lyric.Lyric_s
 }
 
 func NewNeteaseSingleMusic(id int64) *NeteaseSingleMusic_s {
-	rt := NeteaseSingleMusic_s{id: id}
+	rt := NeteaseSingleMusic_s{id: id, needDownload: true}
 	rt.lyric = lyric.NewLyric()
 	rt.fetch()
 	rt.fetchLrc()
 	return &rt
 }
 func NewNeteaseSingleMusicNofetch(id int64) *NeteaseSingleMusic_s {
-	rt := NeteaseSingleMusic_s{id: id}
+	rt := NeteaseSingleMusic_s{id: id, needDownload: true}
 	rt.lyric = lyric.NewLyric()
 	return &rt
+}
+
+func (it *NeteaseSingleMusic_s) singleMusicAna(resp string) {
+	bytes := []byte(resp)
+	value, err := jsonparser.GetString(bytes, "name")
+	if err != nil {
+		log.Panic(err)
+	}
+	it.title = value
+
+	valueInt, err := jsonparser.GetInt(bytes, "no")
+	if err != nil {
+		log.Panic(err)
+	}
+	it.no = cast.ToInt(valueInt)
+
+	value, err = jsonparser.GetString(bytes, "al", "name")
+	if err != nil {
+		log.Panic(err)
+	}
+	it.album = value
+
+	jsonparser.ArrayEach(bytes, func(value []byte, dataType jsonparser.ValueType, offset int, err error) {
+		artist, err := jsonparser.GetString(value, "name")
+		if err != nil {
+			log.Panic(err)
+		}
+		it.artists = append(it.artists, artist)
+	}, "ar")
 }
 
 func (it *NeteaseSingleMusic_s) fetch() {
@@ -41,31 +73,9 @@ func (it *NeteaseSingleMusic_s) fetch() {
 		log.Println(err.Error())
 	}
 	//log.Println(resp)
-	value, err := jsonparser.GetString(resp.Bytes(), "songs", "[0]", "name")
-	if err != nil {
-		log.Panic(err)
-	}
-	it.title = value
+	obj, _, _, _ := jsonparser.Get(resp.Bytes(), "songs", "[0]")
+	it.singleMusicAna(string(obj))
 
-	valueInt, err := jsonparser.GetInt(resp.Bytes(), "songs", "[0]", "no")
-	if err != nil {
-		log.Panic(err)
-	}
-	it.no = cast.ToInt(valueInt)
-
-	value, err = jsonparser.GetString(resp.Bytes(), "songs", "[0]", "al", "name")
-	if err != nil {
-		log.Panic(err)
-	}
-	it.album = value
-
-	jsonparser.ArrayEach(resp.Bytes(), func(value []byte, dataType jsonparser.ValueType, offset int, err error) {
-		artist, err := jsonparser.GetString(value, "name")
-		if err != nil {
-			log.Panic(err)
-		}
-		it.artists = append(it.artists, artist)
-	}, "songs", "[0]", "ar")
 }
 
 func (it *NeteaseSingleMusic_s) fetchLrc() {
@@ -159,6 +169,7 @@ func (it *NeteaseAlbum_s) fetch() {
 	}
 	it.title = value
 
+	listI := 0
 	//遍历内部的歌曲
 	jsonparser.ArrayEach(resp.Bytes(), func(value []byte, dataType jsonparser.ValueType, offset int, err error) {
 		musicId, err := jsonparser.GetInt(value, "id")
@@ -166,6 +177,8 @@ func (it *NeteaseAlbum_s) fetch() {
 			log.Panic(err)
 		}
 		newMusic := NewNeteaseSingleMusicNofetch(musicId)
+		newMusic.listI = listI
+		listI = listI + 1
 		name, err := jsonparser.GetString(value, "name")
 		if err != nil {
 			log.Panic(err)
@@ -190,4 +203,83 @@ func (it *NeteaseAlbum_s) fetch() {
 
 		it.musics = append(it.musics, newMusic)
 	}, "album", "songs")
+}
+
+// 歌单相关
+type NeteasePlaylist_s struct {
+	id     int64
+	title  string
+	musics NeteaseSingleMusics_t
+}
+
+func NewNeteasePlaylist(id int64) *NeteasePlaylist_s {
+	rt := NeteasePlaylist_s{id: id}
+	rt.fetch()
+	rt.fetchMusicDetail()
+	return &rt
+}
+
+func (it *NeteasePlaylist_s) fetch() {
+	resp, err := Client.R().Get(`api/v6/playlist/detail?id=` + cast.ToString(it.id) + `&c=[{"id":"` + cast.ToString(it.id) + `"}]`)
+	if err != nil {
+		log.Println(err.Error())
+	}
+	value, err := jsonparser.GetString(resp.Bytes(), "playlist", "name")
+	if err != nil {
+		log.Panic(err)
+	}
+	it.title = value
+
+	listI := 0
+	//遍历内部的歌曲
+	jsonparser.ArrayEach(resp.Bytes(), func(value []byte, dataType jsonparser.ValueType, offset int, err error) {
+		musicId, err := jsonparser.GetInt(value, "id")
+		if err != nil {
+			log.Panic(err)
+		}
+		newMusic := NewNeteaseSingleMusicNofetch(musicId)
+		newMusic.listI = listI
+		listI = listI + 1
+		//Only ID
+
+		it.musics = append(it.musics, newMusic)
+	}, "playlist", "trackIds")
+}
+
+func (it *NeteasePlaylist_s) fetchMusicDetail() {
+	var build strings.Builder
+
+	i := 0
+	var listIList []int
+	for _, val := range it.musics {
+		if val.needDownload {
+			listIList = append(listIList, val.listI)
+			i = i + 1
+			if i == 1 {
+				tmp := fmt.Sprintf(`{"id":"%d"}`, val.id)
+				build.WriteString(tmp)
+			} else {
+				tmp := fmt.Sprintf(`,{"id":"%d"}`, val.id)
+				build.WriteString(tmp)
+			}
+			if i == 100 {
+				resp, err := Client.R().Get(fmt.Sprintf(`api/v3/song/detail?c=[%s]`, build.String()))
+				if err != nil {
+					log.Println(err.Error())
+				}
+				j := 0
+
+				jsonparser.ArrayEach(resp.Bytes(), func(value []byte, dataType jsonparser.ValueType, offset int, err error) {
+					musicId, err := jsonparser.GetInt(value, "id")
+					if it.musics[listIList[j]].id == musicId {
+						it.musics[listIList[j]].singleMusicAna(string(value))
+						j = j + 1
+					} else {
+						log.Println("Error! Index not match")
+					}
+				}, "songs")
+				break
+			}
+		}
+	}
 }
