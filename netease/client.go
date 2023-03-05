@@ -149,7 +149,7 @@ func Login() {
 }
 
 // 检测登录状态。用户名 (ID), 是否登录
-func checkLogin() (string, bool) {
+func CheckLogin() (string, bool) {
 	resp, err := Client.R().SetBodyString(`{}`).Post(`weapi/w/nuser/account/get`)
 	if err != nil {
 		log.Println(err.Error())

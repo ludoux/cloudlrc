@@ -67,6 +67,10 @@ func (it *NeteaseSingleMusic_s) singleMusicAna(resp string) {
 	}, "ar")
 }
 
+func (it *NeteaseSingleMusic_s) getArtistsStr() string {
+	return strings.Join(it.artists, ",")
+}
+
 func (it *NeteaseSingleMusic_s) fetch() {
 	resp, err := Client.R().Get(`api/v3/song/detail?c=[{"id":"` + cast.ToString(it.id) + `"}]`)
 	if err != nil {
