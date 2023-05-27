@@ -160,7 +160,7 @@ type NeteaseAlbum_s struct {
 	musics NeteaseSingleMusics_t
 }
 
-func NewNeteaseAlbum(id int64) *NeteaseAlbum_s {
+func newNeteaseAlbum(id int64) *NeteaseAlbum_s {
 	rt := NeteaseAlbum_s{id: id}
 	rt.fetch()
 	return &rt

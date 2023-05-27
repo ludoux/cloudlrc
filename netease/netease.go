@@ -77,17 +77,6 @@ func DownloadSingleMusicLrcWCfg(id int64, config Config_s) {
 	if err != nil {
 		fmt.Println(err.Error())
 	}
-	/**
-	if _, err := os.Stat(fileName); os.IsNotExist(err) {
-		_, _ = os.Create(fileName)
-	}
-	f, err := os.OpenFile(fileName, os.O_APPEND|os.O_WRONLY, 0666)
-	defer f.Close()
-	if err != nil {
-		fmt.Println(err.Error())
-	}
-	_, _ = f.WriteString(history)
-	**/
 }
 
 func DownloadPlaylistLrc(id int64) {
@@ -100,6 +89,9 @@ func DownloadPlaylistLrcWCfg(id int64, config Config_s) {
 	path := utils.ToSaveFilename(np.title)
 	os.MkdirAll(path, os.ModePerm)
 	np.musics.fetchLrcsAsync()
+
+	aligncount := len([]rune(cast.ToString(len(np.musics))))
+	aligntext := "%0" + cast.ToString(aligncount) + "d"
 	for _, v := range np.musics {
 		if !v.genlyric {
 			//无需下载，continue
@@ -109,7 +101,39 @@ func DownloadPlaylistLrcWCfg(id int64, config Config_s) {
 
 		filename := config.FileNameStyle
 		filename = strings.ReplaceAll(filename, "<TITLE>", v.title)
-		filename = strings.ReplaceAll(filename, "<AUTONO>", cast.ToString(v.listI+1))
+		filename = strings.ReplaceAll(filename, "<AUTONO>", fmt.Sprintf(aligntext, v.listI+1))
+		filename = strings.ReplaceAll(filename, "<ARTIST>", v.getArtistsStr())
+		filename = utils.ToSaveFilename(filename)
+		err := os.WriteFile(path+"/"+filename, []byte(v.lyric.GetLyrics()), 0666)
+		if err != nil {
+			fmt.Println(err.Error())
+		}
+	}
+}
+
+func DownloadAlbumLrc(id int64) {
+	cfg := Config_s{FileNameStyle: FILENAME_STYLE_1}
+	DownloadAlbumLrcWCfg(id, cfg)
+}
+
+func DownloadAlbumLrcWCfg(id int64, config Config_s) {
+	np := newNeteaseAlbum(id)
+	path := utils.ToSaveFilename(np.title)
+	os.MkdirAll(path, os.ModePerm)
+	np.musics.fetchLrcsAsync()
+
+	aligncount := len([]rune(cast.ToString(len(np.musics))))
+	aligntext := "%0" + cast.ToString(aligncount) + "d"
+	for _, v := range np.musics {
+		if !v.genlyric {
+			//无需下载，continue
+			continue
+		}
+		v.applyConfig(&config)
+
+		filename := config.FileNameStyle
+		filename = strings.ReplaceAll(filename, "<TITLE>", v.title)
+		filename = strings.ReplaceAll(filename, "<AUTONO>", fmt.Sprintf(aligntext, v.listI+1))
 		filename = strings.ReplaceAll(filename, "<ARTIST>", v.getArtistsStr())
 		filename = utils.ToSaveFilename(filename)
 		err := os.WriteFile(path+"/"+filename, []byte(v.lyric.GetLyrics()), 0666)
