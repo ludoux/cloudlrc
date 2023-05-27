@@ -13,7 +13,7 @@ var neteaseLoginStatusCmd = &cobra.Command{
 	Short: "检测本地 cookie 网易云登录状态",
 	Long:  `检测本地 cookie 网易云登录状态`,
 	Run: func(cmd *cobra.Command, args []string) {
-		msg, ornot := netease.CheckLogin()
+		msg, ornot := netease.LoginStatus()
 		if ornot {
 			fmt.Println("已登录，账户:", msg)
 		} else {

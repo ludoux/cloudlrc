@@ -15,13 +15,7 @@ type Config_s struct {
 
 const FILENAME_STYLE_1 = "<TITLE> - <ARTIST>.lrc"
 
-func DownloadSingleMusicLrc(id int64) {
-	cfg := Config_s{FileNameStyle: FILENAME_STYLE_1}
-	DownloadSingleMusicLrcWithConfig(id, cfg)
-}
-
-func DownloadSingleMusicLrcWithConfig(id int64, config Config_s) {
-	nsm := NewNeteaseSingleMusic(id)
+func (nsm *NeteaseSingleMusic_s) applyConfig(config *Config_s) {
 	if config.TransFirst == false && config.TransDelayMs != 0 {
 		nsm.lyric.DelayLyricLine(0, config.TransDelayMs)
 	} else if config.TransFirst == false && config.OriDelayMs != 0 {
@@ -29,6 +23,20 @@ func DownloadSingleMusicLrcWithConfig(id int64, config Config_s) {
 	} else if config.TransFirst {
 		nsm.ChangeTransOrder()
 	}
+}
+
+func (musics NeteaseSingleMusics_t) fetchLrcsAsync() {
+
+}
+
+func DownloadSingleMusicLrc(id int64) {
+	cfg := Config_s{FileNameStyle: FILENAME_STYLE_1}
+	DownloadSingleMusicLrcWCfg(id, cfg)
+}
+
+func DownloadSingleMusicLrcWCfg(id int64, config Config_s) {
+	nsm := newNeteaseSingleMusic(id)
+	nsm.applyConfig(&config)
 
 	filename := config.FileNameStyle
 	filename = strings.ReplaceAll(filename, "<TITLE>", nsm.title)
@@ -48,4 +56,26 @@ func DownloadSingleMusicLrcWithConfig(id int64, config Config_s) {
 	}
 	_, _ = f.WriteString(history)
 	**/
+}
+
+func DownloadPlaylistLrc(id int64) {
+	cfg := Config_s{FileNameStyle: FILENAME_STYLE_1}
+	DownloadPlaylistLrcWCfg(id, cfg)
+}
+
+func DownloadPlaylistLrcWCfg(id int64, config Config_s) {
+	np := newNeteasePlaylist(id)
+	os.MkdirAll(np.title, os.ModePerm)
+
+	for _, v := range np.musics {
+		v.applyConfig(&config)
+
+		filename := fmt.Sprintf("%s/%s", np.title, config.FileNameStyle)
+		filename = strings.ReplaceAll(filename, "<TITLE>", v.title)
+		filename = strings.ReplaceAll(filename, "<ARTIST>", v.getArtistsStr())
+		err := os.WriteFile(filename, []byte(v.lyric.GetLyrics()), 0666)
+		if err != nil {
+			fmt.Println(err.Error())
+		}
+	}
 }

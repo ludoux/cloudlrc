@@ -12,7 +12,8 @@ import (
 
 // 单曲相关
 type NeteaseSingleMusic_s struct {
-	no           int
+	no           int //CD中的顺序
+	listno       int //列表中的顺序，主要是为歌单服务
 	id           int64
 	title        string
 	artists      []string
@@ -25,7 +26,12 @@ type NeteaseSingleMusic_s struct {
 	lyric        *lyric.Lyric_s
 }
 
-func NewNeteaseSingleMusic(id int64) *NeteaseSingleMusic_s {
+/**
+ * @description: 信息和歌词均获得
+ * @param {int64} id
+ * @return {*}
+ */
+func newNeteaseSingleMusic(id int64) *NeteaseSingleMusic_s {
 	rt := NeteaseSingleMusic_s{id: id, needDownload: true}
 	rt.lyric = lyric.NewLyric()
 	rt.fetch()
@@ -38,7 +44,7 @@ func NewNeteaseSingleMusicNofetch(id int64) *NeteaseSingleMusic_s {
 	return &rt
 }
 
-func (it *NeteaseSingleMusic_s) singleMusicAna(resp string) {
+func (it *NeteaseSingleMusic_s) singleMusicAnalyze(resp string) {
 	bytes := []byte(resp)
 	value, err := jsonparser.GetString(bytes, "name")
 	if err != nil {
@@ -78,7 +84,7 @@ func (it *NeteaseSingleMusic_s) fetch() {
 	}
 	//log.Println(resp)
 	obj, _, _, _ := jsonparser.Get(resp.Bytes(), "songs", "[0]")
-	it.singleMusicAna(string(obj))
+	it.singleMusicAnalyze(string(obj))
 
 }
 
@@ -148,8 +154,10 @@ func (it *NeteaseSingleMusic_s) ChangeTransOrder() {
 	it.lyric.SwapPriority(0, 1)
 }
 
-// 专辑相关
+// 列表大相关
 type NeteaseSingleMusics_t []*NeteaseSingleMusic_s
+
+// 专辑相关
 type NeteaseAlbum_s struct {
 	id     int64
 	title  string
@@ -216,7 +224,12 @@ type NeteasePlaylist_s struct {
 	musics NeteaseSingleMusics_t
 }
 
-func NewNeteasePlaylist(id int64) *NeteasePlaylist_s {
+/**
+ * @description: 仅获得信息，不含内部歌曲的歌词
+ * @param {int64} id
+ * @return {*}
+ */
+func newNeteasePlaylist(id int64) *NeteasePlaylist_s {
 	rt := NeteasePlaylist_s{id: id}
 	rt.fetch()
 	rt.fetchMusicDetail()
@@ -250,6 +263,10 @@ func (it *NeteasePlaylist_s) fetch() {
 	}, "playlist", "trackIds")
 }
 
+/**
+ * @description: 对内部的每个100个音乐ID合并发起请求，得到详细信息（不含歌词）
+ * @return {*}
+ */
 func (it *NeteasePlaylist_s) fetchMusicDetail() {
 	var build strings.Builder
 
@@ -266,7 +283,7 @@ func (it *NeteasePlaylist_s) fetchMusicDetail() {
 				tmp := fmt.Sprintf(`,{"id":"%d"}`, val.id)
 				build.WriteString(tmp)
 			}
-			if i == 100 {
+			if i == 100 || i == len(it.musics) {
 				resp, err := Client.R().Get(fmt.Sprintf(`api/v3/song/detail?c=[%s]`, build.String()))
 				if err != nil {
 					log.Println(err.Error())
@@ -276,7 +293,7 @@ func (it *NeteasePlaylist_s) fetchMusicDetail() {
 				jsonparser.ArrayEach(resp.Bytes(), func(value []byte, dataType jsonparser.ValueType, offset int, err error) {
 					musicId, err := jsonparser.GetInt(value, "id")
 					if it.musics[listIList[j]].id == musicId {
-						it.musics[listIList[j]].singleMusicAna(string(value))
+						it.musics[listIList[j]].singleMusicAnalyze(string(value))
 						j = j + 1
 					} else {
 						log.Println("Error! Index not match")

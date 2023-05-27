@@ -20,10 +20,12 @@ require (
 	github.com/mdp/qrterminal/v3 v3.1.1 // indirect
 	github.com/onsi/ginkgo/v2 v2.9.5 // indirect
 	github.com/orirawlings/persistent-cookiejar v0.3.2 // indirect
+	github.com/panjf2000/ants/v2 v2.7.4 // indirect
 	github.com/quic-go/qpack v0.4.0 // indirect
 	github.com/quic-go/qtls-go1-19 v0.3.2 // indirect
 	github.com/quic-go/qtls-go1-20 v0.2.2 // indirect
 	github.com/quic-go/quic-go v0.34.0 // indirect
+	github.com/skip2/go-qrcode v0.0.0-20200617195104-da1b6568686e // indirect
 	github.com/spf13/cobra v1.7.0 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
 	go4.org v0.0.0-20230225012048-214862532bf5 // indirect

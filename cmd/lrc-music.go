@@ -11,7 +11,7 @@ import (
 
 // neteaseCmd represents the netease command
 var lrcMusicCmd = &cobra.Command{
-	Use:   "music [id]",
+	Use:   "music <id...>",
 	Short: "下载单曲的歌词",
 	Long:  `下载单曲的歌词`,
 	Run: func(cmd *cobra.Command, args []string) {

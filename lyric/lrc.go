@@ -235,7 +235,12 @@ func (it *Lyric_s) GetLyrics() string {
 	return build.String()
 }
 
-// 为指定priority的歌词行调整
+/**
+ * @description: 为指定priority的歌词行调整
+ * @param {int} priority
+ * @param {int64} ms
+ * @return {*}
+ */
 func (it *Lyric_s) DelayLyricLine(priority int, ms int64) {
 	for _, val := range it.lyricLines {
 		if val.getPriority() == priority {

@@ -10,6 +10,7 @@ import (
 	"github.com/imroc/req/v3"
 	"github.com/mdp/qrterminal/v3"
 	cookiejar "github.com/orirawlings/persistent-cookiejar"
+	"github.com/skip2/go-qrcode"
 )
 
 type NeteaseClient struct {
@@ -17,11 +18,11 @@ type NeteaseClient struct {
 	isLogged bool
 }
 
-var Client = NewNeteaseClient()
+var Client = newNeteaseClient()
 
-func NewNeteaseClient() *NeteaseClient {
+func newNeteaseClient() *NeteaseClient {
 	jar, err := cookiejar.New(&cookiejar.Options{
-		Filename: "cookies.json",
+		Filename: "cookies_netease.json",
 	})
 	if err != nil {
 		log.Fatalf("failed to create persistent cookiejar: %s\n", err.Error())
@@ -94,7 +95,7 @@ func Demo2() {
 }
 
 func Demo3(id int64) {
-	nsm := NewNeteaseSingleMusic(id)
+	nsm := newNeteaseSingleMusic(id)
 	//nsm.lyric.DelayLyricLine(0, 500)
 	nsm.ChangeTransOrder()
 	fmt.Print(nsm.lyric.GetLyrics())
@@ -106,10 +107,11 @@ func Demo4(id int64) {
 }
 
 func Demo5(id int64) {
-	nnp := NewNeteasePlaylist(id)
+	nnp := newNeteasePlaylist(id)
 	fmt.Println(nnp)
 }
-func Login() {
+
+func LoginGen(genQrFile bool) string {
 	resp, err := Client.R().SetBodyString(`{"type":1}`).Post(`weapi/login/qrcode/unikey`)
 	if err != nil {
 		log.Println(err.Error())
@@ -119,18 +121,25 @@ func Login() {
 		log.Panic(err)
 	}
 
-	config := qrterminal.Config{
-		Level:     qrterminal.L,
-		Writer:    os.Stdout,
-		BlackChar: qrterminal.BLACK,
-		WhiteChar: qrterminal.WHITE,
-		QuietZone: 1,
-	}
-	qrterminal.GenerateWithConfig("https://music.163.com/login?codekey="+unikey, config)
+	if genQrFile {
+		_ = qrcode.WriteFile("https://music.163.com/login?codekey="+unikey, qrcode.Medium, 256, "qr.png")
 
-	for {
+	} else {
+		qrterminal.GenerateWithConfig("https://music.163.com/login?codekey="+unikey, qrterminal.Config{
+			Level:     qrterminal.L,
+			Writer:    os.Stdout,
+			BlackChar: qrterminal.BLACK,
+			WhiteChar: qrterminal.WHITE,
+			QuietZone: 1,
+		})
+	}
+	return unikey
+}
+
+func LoginCheck(unikey string) (bool, string) {
+	for i := 0; i < 20; i++ {
 		time.Sleep(time.Duration(3) * time.Second)
-		resp, err = Client.R().SetBodyString(`{"key":"` + unikey + `","type":1}`).Post(`weapi/login/qrcode/client/login`)
+		resp, err := Client.R().SetBodyString(`{"key":"` + unikey + `","type":1}`).Post(`weapi/login/qrcode/client/login`)
 		if err != nil {
 			log.Println(err.Error())
 		}
@@ -138,18 +147,16 @@ func Login() {
 		if code == 801 || code == 802 {
 			fmt.Print("...")
 		} else if code == 803 {
-			fmt.Println("登录成功")
-			break
+			return true, "登录成功"
 		} else if code == 800 {
-			fmt.Println("用户拒绝登录")
-			break
+			return false, "用户拒绝登录"
 		}
 	}
-	//log.Println(resp)
+	return false, "超时"
 }
 
 // 检测登录状态。用户名 (ID), 是否登录
-func CheckLogin() (string, bool) {
+func LoginStatus() (string, bool) {
 	resp, err := Client.R().SetBodyString(`{}`).Post(`weapi/w/nuser/account/get`)
 	if err != nil {
 		log.Println(err.Error())
