@@ -13,17 +13,17 @@ import (
 // 单曲相关
 type NeteaseSingleMusic_s struct {
 	no           int //CD中的顺序
-	listno       int //列表中的顺序，主要是为歌单服务
 	id           int64
 	title        string
 	artists      []string
 	album        string
 	retry        int
-	listI        int //从0开始
+	listI        int //列表中的顺序，从0开始
 	needDownload bool
 	status       int
 	msg          string
 	lyric        *lyric.Lyric_s
+	genlyric     bool //是否需要生成歌词文件
 }
 
 /**
@@ -89,33 +89,32 @@ func (it *NeteaseSingleMusic_s) fetch() {
 }
 
 func (it *NeteaseSingleMusic_s) fetchLrc() {
-	//获取原文歌词
-	resp, err := Client.R().Get(`api/song/media?id=` + cast.ToString(it.id))
+	it.genlyric = false
+	resp, err := Client.R().Get(`api/song/lyric?os=pc&id=` + cast.ToString(it.id) + `&lv=-1&tv=-1`)
 	if err != nil {
 		log.Println(err.Error())
 	}
-	//TODO: 分析歌词状态 https://github.com/ludoux/LrcHelper/blob/223eaf8b3dc11f13ccc61371a8a222729f402aef/LrcHelper/NeteaseMusic.cs#L93
-
-	if resp.String() == `{"code":200}` {
-		it.lyric.LyricMsg = "未提供歌词"
-		return
-	}
-
-	nolyric, err := jsonparser.GetBoolean(resp.Bytes(), "nolyric")
-	if err == nil && nolyric {
-		//比如 纯音乐
+	if strings.Contains(resp.String(), "纯音乐，请欣赏") {
 		it.lyric.LyricMsg = "无需歌词"
 		return
+	} else {
+		sgc, _ := jsonparser.GetBoolean(resp.Bytes(), "sgc")
+		sfy, _ := jsonparser.GetBoolean(resp.Bytes(), "sfy")
+		qfy, _ := jsonparser.GetBoolean(resp.Bytes(), "qfy")
+		if sgc && sfy && qfy {
+			it.lyric.LyricMsg = "未提供歌词"
+			return
+		}
 	}
-
-	value, err := jsonparser.GetString(resp.Bytes(), "lyric")
+	//原文歌词
+	value, err := jsonparser.GetString(resp.Bytes(), "lrc", "lyric")
 	if err != nil {
 		it.lyric.LyricMsg = "无歌词"
 		return
 	} else {
 		it.lyric.LyricMsg = "有歌词"
 	}
-
+	it.genlyric = true
 	value = strings.ReplaceAll(value, "\\r", "")
 	value = strings.ReplaceAll(value, "\r", "")
 	value = strings.ReplaceAll(value, "\\n", "\n")
@@ -127,10 +126,7 @@ func (it *NeteaseSingleMusic_s) fetchLrc() {
 	}
 
 	//===后面翻译
-	resp, err = Client.R().Get(`api/song/lyric?os=pc&id=` + cast.ToString(it.id) + `&tv=-1`)
-	if err != nil {
-		log.Println(err.Error())
-	}
+
 	value, err = jsonparser.GetString(resp.Bytes(), "tlyric", "lyric")
 	if err != nil && value == "" {
 		it.lyric.LyricMsg += ",无翻译"

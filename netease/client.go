@@ -61,7 +61,7 @@ func newNeteaseClient() *NeteaseClient {
 
 			// Corner case: neither an error response nor a success response,
 			// dump content to help troubleshoot.
-			if !resp.IsSuccess() {
+			if !resp.IsSuccessState() {
 				return fmt.Errorf("bad response, raw dump:\n%s", resp.Dump())
 			}
 			code, err := jsonparser.GetInt(resp.Bytes(), "code")
@@ -84,31 +84,6 @@ func newNeteaseClient() *NeteaseClient {
 	return &NeteaseClient{
 		Client: c,
 	}
-}
-
-func Demo2() {
-	resp, err := Client.R().Get(`api/v3/song/detail?c=[{"id":"426881480"},{"id":"426881487"}]`)
-	if err != nil {
-		log.Println(err.Error())
-	}
-	log.Println(resp)
-}
-
-func Demo3(id int64) {
-	nsm := newNeteaseSingleMusic(id)
-	//nsm.lyric.DelayLyricLine(0, 500)
-	nsm.ChangeTransOrder()
-	fmt.Print(nsm.lyric.GetLyrics())
-}
-func Demo4(id int64) {
-	nsm := NewNeteaseAlbum(id)
-	//nsm.lyric.DelayLyricLine(0, 500)
-	fmt.Println(nsm)
-}
-
-func Demo5(id int64) {
-	nnp := newNeteasePlaylist(id)
-	fmt.Println(nnp)
 }
 
 func LoginGen(genQrFile bool) string {
