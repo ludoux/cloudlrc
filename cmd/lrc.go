@@ -16,8 +16,7 @@ var lrcCmd = &cobra.Command{
 	Short: "下载歌词",
 	Long:  `下载歌词`,
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("lrc called")
-		fmt.Println(cast.ToString(trans_first))
+		//
 	},
 }
 

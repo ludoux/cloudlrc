@@ -14,7 +14,7 @@ var neteaseCmd = &cobra.Command{
 	Short: "接口: 网易云音乐",
 	Long:  `接口: 网易云音乐`,
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("netease called")
+		//
 	},
 }
 var neteaseLoginCmd = &cobra.Command{

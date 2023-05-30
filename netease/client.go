@@ -70,7 +70,7 @@ func newNeteaseClient() *NeteaseClient {
 			}
 			if (code != 200) && (code < 800 || code > 803) {
 				msg, _ := jsonparser.GetString(resp.Bytes(), "message")
-				return fmt.Errorf("Netease API Error: %s", msg)
+				return fmt.Errorf("netease API error: %s", msg)
 			}
 			if code == 803 {
 				err := jar.Save()

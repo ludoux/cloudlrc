@@ -287,7 +287,7 @@ func (it *NeteasePlaylist_s) fetchMusicDetail() {
 				j := 0
 
 				jsonparser.ArrayEach(resp.Bytes(), func(value []byte, dataType jsonparser.ValueType, offset int, err error) {
-					musicId, err := jsonparser.GetInt(value, "id")
+					musicId, _ := jsonparser.GetInt(value, "id")
 					if it.musics[listIList[j]].id == musicId {
 						it.musics[listIList[j]].singleMusicAnalyze(string(value))
 						j = j + 1

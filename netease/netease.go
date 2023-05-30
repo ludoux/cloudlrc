@@ -2,6 +2,7 @@ package netease
 
 import (
 	"fmt"
+	"log"
 	"os"
 	"strings"
 	"sync"
@@ -68,15 +69,24 @@ func DownloadSingleMusicLrc(id int64) {
 
 func DownloadSingleMusicLrcWCfg(id int64, config Config_s) {
 	nsm := newNeteaseSingleMusic(id)
-	nsm.applyConfig(&config)
+	if nsm.genlyric {
+		nsm.applyConfig(&config)
 
-	filename := config.FileNameStyle
-	filename = strings.ReplaceAll(filename, "<TITLE>", nsm.title)
-	filename = strings.ReplaceAll(filename, "<ARTIST>", nsm.getArtistsStr())
-	err := os.WriteFile(filename, []byte(nsm.lyric.GetLyrics()), 0666)
-	if err != nil {
-		fmt.Println(err.Error())
+		filename := config.FileNameStyle
+		filename = strings.ReplaceAll(filename, "<TITLE>", nsm.title)
+		filename = strings.ReplaceAll(filename, "<AUTONO>", "1")
+		filename = strings.ReplaceAll(filename, "<ARTIST>", nsm.getArtistsStr())
+		filename = utils.ToSaveFilename(filename)
+		err := os.WriteFile(filename, []byte(nsm.lyric.GetLyrics()), 0666)
+		if err != nil {
+			log.Fatalln(err.Error())
+		} else {
+			fmt.Printf("已生成: %s\n", filename)
+		}
+	} else {
+		fmt.Println("无歌词以供生成")
 	}
+
 }
 
 func DownloadPlaylistLrc(id int64) {
