@@ -40,13 +40,27 @@ func responseController() {
 	}
 }
 
+/**
+ * @description: Album 和 Playlist 都会调用此方法来获取歌词
+ * @return {*}
+ */
 func (musics NeteaseSingleMusics_t) fetchLrcsAsync() {
 	var wg sync.WaitGroup
 	p, _ := ants.NewPoolWithFunc(2, func(music_i interface{}) {
-		if musics[cast.ToInt(music_i)].needDownload {
+		i := cast.ToInt(music_i)
+		if musics[i].needDownload {
 			time.Sleep(time.Millisecond * time.Duration(330))
-			responseChannel <- fmt.Sprintf("开始下载第 %02d 首歌词", cast.ToInt(music_i))
-			musics[cast.ToInt(music_i)].fetchLrc()
+			err := musics[i].fetchLrc()
+			if err != nil {
+				responseChannel <- fmt.Sprintf("第 %d 首(%d): 发生错误: %s。", cast.ToInt(music_i), musics[i].id, err.Error())
+			} else {
+				if musics[i].genlyric {
+					responseChannel <- fmt.Sprintf("第 %d 首(%d): 下载成功。", cast.ToInt(music_i), musics[i].id)
+				} else {
+					responseChannel <- fmt.Sprintf("第 %d 首(%d): 无歌词。", cast.ToInt(music_i), musics[i].id)
+				}
+			}
+
 		}
 		wg.Done()
 	})

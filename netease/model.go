@@ -88,29 +88,29 @@ func (it *NeteaseSingleMusic_s) fetch() {
 
 }
 
-func (it *NeteaseSingleMusic_s) fetchLrc() {
+func (it *NeteaseSingleMusic_s) fetchLrc() error {
 	it.genlyric = false
 	resp, err := Client.R().Get(`api/song/lyric?os=pc&id=` + cast.ToString(it.id) + `&lv=-1&tv=-1`)
 	if err != nil {
-		log.Println(err.Error())
+		return fmt.Errorf("获取服务端歌词错误: %s", err.Error())
 	}
 	if strings.Contains(resp.String(), "纯音乐，请欣赏") {
 		it.lyric.LyricMsg = "无需歌词"
-		return
+		return nil
 	} else {
 		sgc, _ := jsonparser.GetBoolean(resp.Bytes(), "sgc")
 		sfy, _ := jsonparser.GetBoolean(resp.Bytes(), "sfy")
 		qfy, _ := jsonparser.GetBoolean(resp.Bytes(), "qfy")
 		if sgc && sfy && qfy {
 			it.lyric.LyricMsg = "未提供歌词"
-			return
+			return nil
 		}
 	}
 	//原文歌词
 	value, err := jsonparser.GetString(resp.Bytes(), "lrc", "lyric")
 	if err != nil {
 		it.lyric.LyricMsg = "无歌词"
-		return
+		return nil
 	} else {
 		it.lyric.LyricMsg = "有歌词"
 	}
@@ -130,7 +130,7 @@ func (it *NeteaseSingleMusic_s) fetchLrc() {
 	value, err = jsonparser.GetString(resp.Bytes(), "tlyric", "lyric")
 	if err != nil && value == "" {
 		it.lyric.LyricMsg += ",无翻译"
-		return
+		return nil
 	}
 	it.lyric.LyricMsg += ",有翻译"
 
@@ -143,6 +143,7 @@ func (it *NeteaseSingleMusic_s) fetchLrc() {
 		//译文优先级较低
 		it.lyric.AppendLyricTextLine(val, 0)
 	}
+	return nil
 }
 
 // 调换原文和翻译的优先级

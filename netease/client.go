@@ -35,6 +35,7 @@ func newNeteaseClient() *NeteaseClient {
 		SetBaseURL("https://music.163.com").
 		SetCommonHeader("Referer", "https://music.163.com").
 		SetUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.110 Safari/537.36 Edg/96.0.1054.62").
+		SetTimeout(time.Duration(2) * time.Second).
 
 		// EnableDump at the request level in request middleware which dump content into
 		// memory (not print to stdout), we can record dump content only when unexpected
@@ -62,7 +63,7 @@ func newNeteaseClient() *NeteaseClient {
 			// Corner case: neither an error response nor a success response,
 			// dump content to help troubleshoot.
 			if !resp.IsSuccessState() {
-				return fmt.Errorf("bad response, raw dump:\n%s", resp.Dump())
+				return fmt.Errorf("网络请求失败！错误信息: %s\nRaw dump:\n%s", resp.Err.Error(), resp.Dump())
 			}
 			code, err := jsonparser.GetInt(resp.Bytes(), "code")
 			if err != nil {
@@ -112,8 +113,8 @@ func LoginGen(genQrFile bool) string {
 }
 
 func LoginCheck(unikey string) (bool, string) {
-	for i := 0; i < 20; i++ {
-		time.Sleep(time.Duration(3) * time.Second)
+	for i := 0; i < 10; i++ {
+
 		resp, err := Client.R().SetBodyString(`{"key":"` + unikey + `","type":1}`).Post(`weapi/login/qrcode/client/login`)
 		if err != nil {
 			log.Println(err.Error())
@@ -126,6 +127,7 @@ func LoginCheck(unikey string) (bool, string) {
 		} else if code == 800 {
 			return false, "用户拒绝登录"
 		}
+		time.Sleep(time.Duration(3) * time.Second)
 	}
 	return false, "超时"
 }
@@ -134,7 +136,7 @@ func LoginCheck(unikey string) (bool, string) {
 func LoginStatus() (string, bool) {
 	resp, err := Client.R().SetBodyString(`{}`).Post(`weapi/w/nuser/account/get`)
 	if err != nil {
-		log.Println(err.Error())
+		log.Fatalln(err.Error())
 	}
 	nickname, err := jsonparser.GetString(resp.Bytes(), "profile", "nickname")
 	if err != nil {
