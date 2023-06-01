@@ -269,7 +269,7 @@ func (it *NeteasePlaylist_s) fetchMusicDetail() {
 
 	i := 0
 	var listIList []int
-	for _, val := range it.musics {
+	for index, val := range it.musics {
 		if val.needDownload {
 			listIList = append(listIList, val.listI)
 			i = i + 1
@@ -280,7 +280,7 @@ func (it *NeteasePlaylist_s) fetchMusicDetail() {
 				tmp := fmt.Sprintf(`,{"id":"%d"}`, val.id)
 				build.WriteString(tmp)
 			}
-			if i == 100 || i == len(it.musics) {
+			if i == 100 || index+1 == len(it.musics) {
 				resp, err := Client.R().Get(fmt.Sprintf(`api/v3/song/detail?c=[%s]`, build.String()))
 				if err != nil {
 					log.Println(err.Error())
