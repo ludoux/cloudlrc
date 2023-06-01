@@ -52,12 +52,12 @@ func (musics NeteaseSingleMusics_t) fetchLrcsAsync() {
 			time.Sleep(time.Millisecond * time.Duration(330))
 			err := musics[i].fetchLrc()
 			if err != nil {
-				responseChannel <- fmt.Sprintf("第 %d 首(%d): 发生错误: %s。", cast.ToInt(music_i), musics[i].id, err.Error())
+				responseChannel <- fmt.Sprintf("第 %d 首<%s>(%d): 发生错误: %s。", i+1, musics[i].title, musics[i].id, err.Error())
 			} else {
 				if musics[i].genlyric {
-					responseChannel <- fmt.Sprintf("第 %d 首(%d): 下载成功。", cast.ToInt(music_i), musics[i].id)
+					responseChannel <- fmt.Sprintf("第 %d 首<%s>(%d): 下载成功。", i+1, musics[i].title, musics[i].id)
 				} else {
-					responseChannel <- fmt.Sprintf("第 %d 首(%d): 无歌词。", cast.ToInt(music_i), musics[i].id)
+					responseChannel <- fmt.Sprintf("第 %d 首<%s>(%d): 无歌词。", i+1, musics[i].title, musics[i].id)
 				}
 			}
 
@@ -66,14 +66,14 @@ func (musics NeteaseSingleMusics_t) fetchLrcsAsync() {
 	})
 	defer p.Release()
 	go responseController()
-	startTime := time.Now()
+	//startTime := time.Now()
 	for i := range musics {
 		wg.Add(1)
 		_ = p.Invoke(i)
 	}
 	wg.Wait()
-	elapsedTime := time.Since(startTime) / time.Millisecond
-	fmt.Printf("下载歌词总耗时: %dms\n", elapsedTime)
+	//elapsedTime := time.Since(startTime) / time.Millisecond
+	//fmt.Printf("下载歌词总耗时: %dms\n", elapsedTime)
 }
 
 func DownloadSingleMusicLrc(id int64) {
@@ -112,6 +112,8 @@ func DownloadPlaylistLrcWCfg(id int64, config Config_s) {
 	np := newNeteasePlaylist(id)
 	path := utils.ToSaveFilename(np.title)
 	os.MkdirAll(path, os.ModePerm)
+	fmt.Println("音乐总数:", len(np.musics))
+
 	np.musics.fetchLrcsAsync()
 
 	aligncount := len([]rune(cast.ToString(len(np.musics))))
@@ -144,6 +146,8 @@ func DownloadAlbumLrcWCfg(id int64, config Config_s) {
 	np := newNeteaseAlbum(id)
 	path := utils.ToSaveFilename(np.title)
 	os.MkdirAll(path, os.ModePerm)
+	fmt.Println("音乐总数:", len(np.musics))
+
 	np.musics.fetchLrcsAsync()
 
 	aligncount := len([]rune(cast.ToString(len(np.musics))))

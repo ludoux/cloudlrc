@@ -7,7 +7,10 @@ import (
 )
 
 var (
-	VERSION = "0.0.0"
+	VERSION    = "0.0.0"
+	GIT_HASH   = ""
+	BUILD_TIME = ""
+	GO_VER     = ""
 )
 
 var versionCmd = &cobra.Command{
@@ -15,7 +18,10 @@ var versionCmd = &cobra.Command{
 	Short: "显示版本信息",
 	Long:  `显示版本信息`,
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Printf("cloudlrc %s\n", VERSION)
+		fmt.Println("cloudlrc Version:", VERSION)
+		fmt.Println("GIT_HASH:", GIT_HASH)
+		fmt.Println("BUILD_TIME:", BUILD_TIME)
+		fmt.Println("GO_VER:", GO_VER)
 	},
 }
 

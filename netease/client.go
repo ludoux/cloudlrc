@@ -63,7 +63,7 @@ func newNeteaseClient() *NeteaseClient {
 			// Corner case: neither an error response nor a success response,
 			// dump content to help troubleshoot.
 			if !resp.IsSuccessState() {
-				return fmt.Errorf("网络请求失败！错误信息: %s\nRaw dump:\n%s", resp.Err.Error(), resp.Dump())
+				return fmt.Errorf("网络请求失败！错误信息: %s", resp.Err.Error())
 			}
 			code, err := jsonparser.GetInt(resp.Bytes(), "code")
 			if err != nil {
