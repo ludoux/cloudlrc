@@ -296,7 +296,9 @@ func (it *NeteasePlaylist_s) fetchMusicDetail() {
 						log.Println("Error! Index not match")
 					}
 				}, "songs")
-				break
+				listIList = listIList[0:0]
+				build.Reset()
+				i = 0
 			}
 		}
 	}
