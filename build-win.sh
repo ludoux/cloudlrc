@@ -1,0 +1,2 @@
+rm *.exe
+CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -ldflags="-X 'github.com/ludoux/cloudlrc/cmd.GIT_HASH=$(git show -s --format=%H)' -X 'github.com/ludoux/cloudlrc/cmd.BUILD_TIME=$(date -R)' -X 'github.com/ludoux/cloudlrc/cmd.GO_VER=$(go version)'"

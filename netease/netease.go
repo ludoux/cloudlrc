@@ -22,7 +22,8 @@ type Config_s struct {
 	FileNameStyle string
 }
 
-const FILENAME_STYLE_1 = "<AUTONO>. <TITLE> - <ARTIST>.lrc"
+const FILENAME_STYLE_1 = "<AUTONO>. <TITLE>.lrc"
+const FILENAME_STYLE_2 = "<AUTONO>. <TITLE> - <ARTIST>.lrc"
 
 func (nsm *NeteaseSingleMusic_s) applyConfig(config *Config_s) {
 	if !config.TransFirst && config.TransDelayMs != 0 {

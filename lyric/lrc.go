@@ -18,25 +18,45 @@ type LyricLine_s struct {
 	text     string
 	is_tag   bool
 	priority int
+	forceH   bool
+	force3ms bool
 }
 
 type LyricLines_t []*LyricLine_s
+
+type LyricConfig_s struct {
+	Style            int
+	DelayMs          int
+	Split            string
+	SkipEmpty        bool
+	TimelineForceH   bool
+	TimelineForce3ms bool
+}
 
 type Lyric_s struct {
 	//LyricStatus int
 	LyricMsg   string
 	lyricLines LyricLines_t
+	lyricCfg   LyricConfig_s
 }
 
 func NewLyricLine() *LyricLine_s {
 	rt := LyricLine_s{}
 	rt.is_tag = false
 	rt.priority = 0
+	rt.forceH = false
+	rt.force3ms = false
 	return &rt
 }
 
 func NewLyric() *Lyric_s {
 	rt := Lyric_s{}
+	rt.lyricCfg.Style = 3
+	rt.lyricCfg.DelayMs = 100
+	rt.lyricCfg.Split = " "
+	rt.lyricCfg.SkipEmpty = true
+	rt.lyricCfg.TimelineForceH = false
+	rt.lyricCfg.TimelineForce3ms = false
 	return &rt
 }
 
@@ -138,11 +158,21 @@ func (it *LyricLine_s) setTimeAndText(value string, priority int) error {
 	return nil
 }
 func (it *LyricLine_s) GetTimeStringWithBrackets() string {
-	return fmt.Sprintf("[%d:%2d:%2d.%.3d]", it.time_hr, it.time_min, it.time_sec, it.time_ms)
+	return fmt.Sprintf("[%s]", it.GetTimeStringNoBrackets())
 
 }
 func (it *LyricLine_s) GetTimeStringNoBrackets() string {
-	return fmt.Sprintf("%d:%2d:%2d.%.3d", it.time_hr, it.time_min, it.time_sec, it.time_ms)
+	var build strings.Builder
+	if it.forceH || it.time_hr > 0 {
+		build.WriteString(fmt.Sprintf("%d:", it.time_hr))
+	}
+	build.WriteString(fmt.Sprintf("%02d:%02d", it.time_min, it.time_sec))
+	if it.force3ms || it.time_ms > 99 {
+		build.WriteString(fmt.Sprintf(".%.3d", it.time_ms))
+	} else {
+		build.WriteString(fmt.Sprintf(".%.2d", it.time_ms))
+	}
+	return build.String()
 }
 
 func (it *LyricLine_s) getTimelineInMs() int64 {
@@ -212,12 +242,14 @@ func (it *LyricLine_s) GetLyricLine() string {
 	if it.is_tag {
 		return it.text
 	} else {
-		return fmt.Sprintf("[%d:%02d:%02d.%.3d]%s", it.time_hr, it.time_min, it.time_sec, it.time_ms, it.text)
+		return fmt.Sprintf("%s%s", it.GetTimeStringWithBrackets(), it.text)
 	}
 }
 
 func (it *Lyric_s) AppendLyricTextLine(value string, priority int) {
 	ll := NewLyricLine()
+	ll.force3ms = it.lyricCfg.TimelineForce3ms
+	ll.forceH = it.lyricCfg.TimelineForceH
 	ll.setTimeAndText(value, priority)
 
 	it.lyricLines = append(it.lyricLines, ll)
@@ -229,6 +261,9 @@ func (it *Lyric_s) GetLyrics() string {
 	var build strings.Builder
 
 	for _, val := range it.lyricLines {
+		if it.lyricCfg.SkipEmpty && (val.text == "" || strings.ReplaceAll(val.text, " ", "") == "") {
+			continue
+		}
 		build.WriteString(val.GetLyricLine())
 		build.WriteString("\n")
 	}
