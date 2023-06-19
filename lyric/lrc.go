@@ -17,7 +17,7 @@ type LyricLine_s struct {
 	time_ms  int
 	text     string
 	is_tag   bool
-	priority int
+	priority int //越大，同时轴越前
 	forceH   bool
 	force3ms bool
 }
@@ -25,12 +25,11 @@ type LyricLine_s struct {
 type LyricLines_t []*LyricLine_s
 
 type LyricConfig_s struct {
-	Style            int
-	DelayMs          int
-	Split            string
-	SkipEmpty        bool
-	TimelineForceH   bool
-	TimelineForce3ms bool
+	CombineSameTimeline bool
+	Split               string
+	SkipEmpty           bool
+	TimelineForceH      bool
+	TimelineForce3ms    bool
 }
 
 type Lyric_s struct {
@@ -51,9 +50,8 @@ func NewLyricLine() *LyricLine_s {
 
 func NewLyric() *Lyric_s {
 	rt := Lyric_s{}
-	rt.lyricCfg.Style = 3
-	rt.lyricCfg.DelayMs = 100
-	rt.lyricCfg.Split = " "
+	rt.lyricCfg.CombineSameTimeline = true
+	rt.lyricCfg.Split = "#"
 	rt.lyricCfg.SkipEmpty = true
 	rt.lyricCfg.TimelineForceH = false
 	rt.lyricCfg.TimelineForce3ms = false
@@ -259,12 +257,37 @@ func (it *Lyric_s) GetLyrics() string {
 	//sort.Sort(it.lyricLines)
 	sort.Sort(sort.Reverse(it.lyricLines))
 	var build strings.Builder
-
+	preTimeline := ""
+	storedText := ""
 	for _, val := range it.lyricLines {
 		if it.lyricCfg.SkipEmpty && (val.text == "" || strings.ReplaceAll(val.text, " ", "") == "") {
 			continue
 		}
-		build.WriteString(val.GetLyricLine())
+		if it.lyricCfg.CombineSameTimeline {
+			if preTimeline != val.GetTimeStringWithBrackets() {
+				//新的开始
+				if preTimeline != "" {
+					//前者有数据，先输出
+					build.WriteString(preTimeline)
+					build.WriteString(storedText)
+					build.WriteString("\n")
+				}
+				//存储新的开始
+				preTimeline = val.GetTimeStringWithBrackets()
+				storedText = val.text
+			} else {
+				//当前为同timeline下的其它行
+				storedText = storedText + it.lyricCfg.Split + val.text
+			}
+		} else {
+			build.WriteString(val.GetLyricLine())
+			build.WriteString("\n")
+		}
+	}
+	//导出最后一组
+	if it.lyricCfg.CombineSameTimeline {
+		build.WriteString(preTimeline)
+		build.WriteString(storedText)
 		build.WriteString("\n")
 	}
 	return build.String()
