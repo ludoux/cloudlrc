@@ -7,6 +7,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/ludoux/cloudlrc/cfg"
 	"github.com/spf13/cast"
 )
 
@@ -19,7 +20,7 @@ type LyricLine_s struct {
 	is_tag   bool
 	priority int //越大，同时轴越前
 	forceH   bool
-	force3ms bool
+	force2ms bool
 }
 
 type LyricLines_t []*LyricLine_s
@@ -36,25 +37,21 @@ type Lyric_s struct {
 	//LyricStatus int
 	LyricMsg   string
 	lyricLines LyricLines_t
-	lyricCfg   LyricConfig_s
+	lyricCfg   cfg.CfgLrc_s
 }
 
-func NewLyricLine() *LyricLine_s {
+func newLyricLine() *LyricLine_s {
 	rt := LyricLine_s{}
 	rt.is_tag = false
 	rt.priority = 0
 	rt.forceH = false
-	rt.force3ms = false
+	rt.force2ms = false
 	return &rt
 }
 
-func NewLyric() *Lyric_s {
+func NewLyric(cfg *cfg.CfgLrc_s) *Lyric_s {
 	rt := Lyric_s{}
-	rt.lyricCfg.CombineSameTimeline = true
-	rt.lyricCfg.Split = "#"
-	rt.lyricCfg.SkipEmpty = true
-	rt.lyricCfg.TimelineForceH = false
-	rt.lyricCfg.TimelineForce3ms = false
+	rt.lyricCfg = *cfg
 	return &rt
 }
 
@@ -98,6 +95,9 @@ func (it *LyricLine_s) setTimeline(value string) error {
 		if len(submatch[5]) > 0 {
 			it.time_ms = cast.ToInt(string(submatch[5]))
 		}
+		if it.force2ms && it.time_ms > 99 {
+			it.time_ms /= 10
+		}
 		return nil
 	}
 
@@ -109,6 +109,9 @@ func (it *LyricLine_s) setTimeline(value string) error {
 		if len(submatch[4]) > 0 {
 			it.time_ms = cast.ToInt(string(submatch[4]))
 		}
+		if it.force2ms && it.time_ms > 99 {
+			it.time_ms /= 10
+		}
 		return nil
 	}
 
@@ -119,6 +122,9 @@ func (it *LyricLine_s) setTimeline(value string) error {
 		it.time_sec = cast.ToInt(string(submatch[1]))
 		if len(submatch[3]) > 0 {
 			it.time_ms = cast.ToInt(string(submatch[3]))
+		}
+		if it.force2ms && it.time_ms > 99 {
+			it.time_ms /= 10
 		}
 		return nil
 	}
@@ -165,11 +171,7 @@ func (it *LyricLine_s) GetTimeStringNoBrackets() string {
 		build.WriteString(fmt.Sprintf("%d:", it.time_hr))
 	}
 	build.WriteString(fmt.Sprintf("%02d:%02d", it.time_min, it.time_sec))
-	if it.force3ms || it.time_ms > 99 {
-		build.WriteString(fmt.Sprintf(".%.3d", it.time_ms))
-	} else {
-		build.WriteString(fmt.Sprintf(".%.2d", it.time_ms))
-	}
+	build.WriteString(fmt.Sprintf(".%.2d", it.time_ms))
 	return build.String()
 }
 
@@ -245,9 +247,9 @@ func (it *LyricLine_s) GetLyricLine() string {
 }
 
 func (it *Lyric_s) AppendLyricTextLine(value string, priority int) {
-	ll := NewLyricLine()
-	ll.force3ms = it.lyricCfg.TimelineForce3ms
-	ll.forceH = it.lyricCfg.TimelineForceH
+	ll := newLyricLine()
+	ll.force2ms = it.lyricCfg.TimelineForceFixMs
+	ll.forceH = it.lyricCfg.TimelineForceHour
 	ll.setTimeAndText(value, priority)
 
 	it.lyricLines = append(it.lyricLines, ll)
@@ -263,7 +265,7 @@ func (it *Lyric_s) GetLyrics() string {
 		if it.lyricCfg.SkipEmpty && (val.text == "" || strings.ReplaceAll(val.text, " ", "") == "") {
 			continue
 		}
-		if it.lyricCfg.CombineSameTimeline {
+		if it.lyricCfg.Style == 3 {
 			if preTimeline != val.GetTimeStringWithBrackets() {
 				//新的开始
 				if preTimeline != "" {
@@ -285,7 +287,7 @@ func (it *Lyric_s) GetLyrics() string {
 		}
 	}
 	//导出最后一组
-	if it.lyricCfg.CombineSameTimeline {
+	if it.lyricCfg.Style == 3 {
 		build.WriteString(preTimeline)
 		build.WriteString(storedText)
 		build.WriteString("\n")

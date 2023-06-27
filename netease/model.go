@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/buger/jsonparser"
+	"github.com/ludoux/cloudlrc/cfg"
 	"github.com/ludoux/cloudlrc/lyric"
 	"github.com/spf13/cast"
 )
@@ -33,14 +34,14 @@ type NeteaseSingleMusic_s struct {
  */
 func newNeteaseSingleMusic(id int64) *NeteaseSingleMusic_s {
 	rt := NeteaseSingleMusic_s{id: id, needDownload: true}
-	rt.lyric = lyric.NewLyric()
+	rt.lyric = lyric.NewLyric(cfg.GetCfgLrc())
 	rt.fetch()
 	rt.fetchLrc()
 	return &rt
 }
 func NewNeteaseSingleMusicNofetch(id int64) *NeteaseSingleMusic_s {
 	rt := NeteaseSingleMusic_s{id: id, needDownload: true}
-	rt.lyric = lyric.NewLyric()
+	rt.lyric = lyric.NewLyric(cfg.GetCfgLrc())
 	return &rt
 }
 
