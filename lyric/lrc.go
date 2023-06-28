@@ -30,7 +30,7 @@ type LyricConfig_s struct {
 	Split               string
 	SkipEmpty           bool
 	TimelineForceH      bool
-	TimelineForce3ms    bool
+	TimelineForce2ms    bool
 }
 
 type Lyric_s struct {

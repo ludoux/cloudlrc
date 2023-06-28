@@ -1,44 +1,45 @@
 package netease
 
 import (
+	"bytes"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"os"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/ludoux/cloudlrc/cfg"
 	"github.com/ludoux/cloudlrc/utils"
 	"github.com/panjf2000/ants/v2"
 	"github.com/spf13/cast"
+	"golang.org/x/text/encoding/simplifiedchinese"
+	"golang.org/x/text/transform"
 )
 
 var responseChannel = make(chan string, 15)
-
-type Config_s struct {
-	TransFirst    bool
-	OriDelayMs    int64
-	TransDelayMs  int64
-	FileNameStyle string
-}
-
-const FILENAME_STYLE_1 = "<AUTONO>. <TITLE>.lrc"
-const FILENAME_STYLE_2 = "<AUTONO>. <TITLE> - <ARTIST>.lrc"
-
-func (nsm *NeteaseSingleMusic_s) applyConfig(config *Config_s) {
-	if !config.TransFirst && config.TransDelayMs != 0 {
-		nsm.lyric.DelayLyricLine(0, config.TransDelayMs)
-	} else if !config.TransFirst && config.OriDelayMs != 0 {
-		nsm.lyric.DelayLyricLine(1, config.OriDelayMs)
-	} else if config.TransFirst {
-		nsm.ChangeTransOrder()
-	}
-}
 
 func responseController() {
 	for rc := range responseChannel {
 		fmt.Println(rc)
 	}
+}
+
+func convertEncoding(s string, newEncoding string) []byte {
+	if strings.ToLower(newEncoding) == "utf8" || strings.ToLower(newEncoding) == "utf-8" {
+		return []byte(s)
+	}
+	if strings.ToLower(newEncoding) == "gbk" || strings.ToLower(newEncoding) == "gb2312" {
+		reader := transform.NewReader(bytes.NewReader([]byte(s)), simplifiedchinese.GBK.NewEncoder())
+		b, err := ioutil.ReadAll(reader)
+		if err != nil {
+			log.Panicln(newEncoding, "字符编码转换失败:", err.Error())
+		}
+		return b
+	}
+	log.Fatalln("字符编码转换失败:", newEncoding)
+	return []byte("")
 }
 
 /**
@@ -78,21 +79,20 @@ func (musics NeteaseSingleMusics_t) fetchLrcsAsync() {
 }
 
 func DownloadSingleMusicLrc(id int64) {
-	cfg := Config_s{FileNameStyle: FILENAME_STYLE_1}
+	cfg := cfg.GetCfgFile()
 	DownloadSingleMusicLrcWCfg(id, cfg)
 }
 
-func DownloadSingleMusicLrcWCfg(id int64, config Config_s) {
+func DownloadSingleMusicLrcWCfg(id int64, config *cfg.CfgFile_s) {
 	nsm := newNeteaseSingleMusic(id)
 	if nsm.genlyric {
-		nsm.applyConfig(&config)
 
-		filename := config.FileNameStyle
+		filename := config.Filename + "." + strings.ToLower(config.Format)
 		filename = strings.ReplaceAll(filename, "<TITLE>", nsm.title)
-		filename = strings.ReplaceAll(filename, "<AUTONO>", "1")
+		filename = strings.ReplaceAll(filename, "<AUTO_NO>", "1")
 		filename = strings.ReplaceAll(filename, "<ARTIST>", nsm.getArtistsStr())
 		filename = utils.ToSaveFilename(filename)
-		err := os.WriteFile(filename, []byte(nsm.lyric.GetLyrics()), 0666)
+		err := os.WriteFile(filename, convertEncoding(nsm.lyric.GetLyrics(), config.Encoding), 0666)
 		if err != nil {
 			log.Fatalln(err.Error())
 		} else {
@@ -105,11 +105,11 @@ func DownloadSingleMusicLrcWCfg(id int64, config Config_s) {
 }
 
 func DownloadPlaylistLrc(id int64) {
-	cfg := Config_s{FileNameStyle: FILENAME_STYLE_1}
+	cfg := cfg.GetCfgFile()
 	DownloadPlaylistLrcWCfg(id, cfg)
 }
 
-func DownloadPlaylistLrcWCfg(id int64, config Config_s) {
+func DownloadPlaylistLrcWCfg(id int64, config *cfg.CfgFile_s) {
 	np := newNeteasePlaylist(id)
 	path := utils.ToSaveFilename(np.title)
 	os.MkdirAll(path, os.ModePerm)
@@ -124,14 +124,13 @@ func DownloadPlaylistLrcWCfg(id int64, config Config_s) {
 			//无需下载，continue
 			continue
 		}
-		v.applyConfig(&config)
 
-		filename := config.FileNameStyle
+		filename := config.Filename + "." + strings.ToLower(config.Format)
 		filename = strings.ReplaceAll(filename, "<TITLE>", v.title)
-		filename = strings.ReplaceAll(filename, "<AUTONO>", fmt.Sprintf(aligntext, v.listI+1))
+		filename = strings.ReplaceAll(filename, "<AUTO_NO>", fmt.Sprintf(aligntext, v.listI+1))
 		filename = strings.ReplaceAll(filename, "<ARTIST>", v.getArtistsStr())
 		filename = utils.ToSaveFilename(filename)
-		err := os.WriteFile(path+"/"+filename, []byte(v.lyric.GetLyrics()), 0666)
+		err := os.WriteFile(path+"/"+filename, convertEncoding(v.lyric.GetLyrics(), config.Encoding), 0666)
 		if err != nil {
 			fmt.Println(err.Error())
 		}
@@ -139,11 +138,11 @@ func DownloadPlaylistLrcWCfg(id int64, config Config_s) {
 }
 
 func DownloadAlbumLrc(id int64) {
-	cfg := Config_s{FileNameStyle: FILENAME_STYLE_1}
+	cfg := cfg.GetCfgFile()
 	DownloadAlbumLrcWCfg(id, cfg)
 }
 
-func DownloadAlbumLrcWCfg(id int64, config Config_s) {
+func DownloadAlbumLrcWCfg(id int64, config *cfg.CfgFile_s) {
 	np := newNeteaseAlbum(id)
 	path := utils.ToSaveFilename(np.title)
 	os.MkdirAll(path, os.ModePerm)
@@ -158,14 +157,13 @@ func DownloadAlbumLrcWCfg(id int64, config Config_s) {
 			//无需下载，continue
 			continue
 		}
-		v.applyConfig(&config)
 
-		filename := config.FileNameStyle
+		filename := config.Filename + "." + strings.ToLower(config.Format)
 		filename = strings.ReplaceAll(filename, "<TITLE>", v.title)
-		filename = strings.ReplaceAll(filename, "<AUTONO>", fmt.Sprintf(aligntext, v.listI+1))
+		filename = strings.ReplaceAll(filename, "<AUTO_NO>", fmt.Sprintf(aligntext, v.listI+1))
 		filename = strings.ReplaceAll(filename, "<ARTIST>", v.getArtistsStr())
 		filename = utils.ToSaveFilename(filename)
-		err := os.WriteFile(path+"/"+filename, []byte(v.lyric.GetLyrics()), 0666)
+		err := os.WriteFile(path+"/"+filename, convertEncoding(v.lyric.GetLyrics(), config.Encoding), 0666)
 		if err != nil {
 			fmt.Println(err.Error())
 		}
