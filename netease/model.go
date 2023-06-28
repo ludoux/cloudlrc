@@ -13,7 +13,8 @@ import (
 
 // 单曲相关
 type NeteaseSingleMusic_s struct {
-	no           int //CD中的顺序
+	trackNo      int //CD中的顺序(track_no)
+	discNo       int
 	id           int64
 	title        string
 	artists      []string
@@ -55,9 +56,17 @@ func (it *NeteaseSingleMusic_s) singleMusicAnalyze(resp string) {
 
 	valueInt, err := jsonparser.GetInt(bytes, "no")
 	if err != nil {
-		log.Panic(err)
+		it.trackNo = 1
+	} else {
+		it.trackNo = cast.ToInt(valueInt)
 	}
-	it.no = cast.ToInt(valueInt)
+
+	value, err = jsonparser.GetString(bytes, "disc")
+	if err != nil {
+		it.discNo = 1
+	} else {
+		it.discNo = cast.ToInt(value)
+	}
 
 	value, err = jsonparser.GetString(bytes, "al", "name")
 	if err != nil {
@@ -200,9 +209,17 @@ func (it *NeteaseAlbum_s) fetch() {
 
 		valueInt, err := jsonparser.GetInt(value, "no")
 		if err != nil {
-			log.Panic(err)
+			newMusic.trackNo = 1
+		} else {
+			newMusic.trackNo = cast.ToInt(valueInt)
 		}
-		newMusic.no = cast.ToInt(valueInt)
+
+		disc, err := jsonparser.GetString(value, "disc")
+		if err != nil {
+			newMusic.discNo = 1
+		} else {
+			newMusic.discNo = cast.ToInt(disc)
+		}
 
 		newMusic.album = it.title
 
