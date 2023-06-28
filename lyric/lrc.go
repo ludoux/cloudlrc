@@ -162,10 +162,16 @@ func (it *LyricLine_s) setTimeAndText(value string, priority int) error {
 	return nil
 }
 func (it *LyricLine_s) GetTimeStringWithBrackets() string {
+	if it.is_tag {
+		return ""
+	}
 	return fmt.Sprintf("[%s]", it.GetTimeStringNoBrackets())
 
 }
 func (it *LyricLine_s) GetTimeStringNoBrackets() string {
+	if it.is_tag {
+		return ""
+	}
 	var build strings.Builder
 	if it.forceH || it.time_hr > 0 {
 		build.WriteString(fmt.Sprintf("%d:", it.time_hr))
@@ -265,7 +271,7 @@ func (it *Lyric_s) GetLyrics() string {
 		if it.lyricCfg.SkipEmpty && (val.text == "" || strings.ReplaceAll(val.text, " ", "") == "") {
 			continue
 		}
-		if it.lyricCfg.Style == 3 {
+		if it.lyricCfg.Style == 3 && !val.is_tag {
 			if preTimeline != val.GetTimeStringWithBrackets() {
 				//新的开始
 				if preTimeline != "" {

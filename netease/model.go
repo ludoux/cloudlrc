@@ -142,6 +142,9 @@ func (it *NeteaseSingleMusic_s) fetchLrc() error {
 	txtLines = strings.Split(value, "\n")
 	for _, val := range txtLines {
 		//译文优先级较低
+		if strings.HasPrefix(val, "[by:") || strings.HasPrefix(val, "[By:") {
+			val = strings.TrimSuffix(val, "]") + " (网易云歌词翻译)]"
+		}
 		it.lyric.AppendLyricTextLine(val, 0)
 	}
 	return nil
