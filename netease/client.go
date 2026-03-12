@@ -88,7 +88,7 @@ func newNeteaseClient() *NeteaseClient {
 }
 
 func LoginGen(genQrFile bool) string {
-	resp, err := Client.R().SetBodyString(`{"type":1}`).Post(`weapi/login/qrcode/unikey`)
+	resp, err := Client.R().SetBodyString(`{"type":3}`).Post(`weapi/login/qrcode/unikey`)
 	if err != nil {
 		log.Println(err.Error())
 	}
@@ -115,7 +115,7 @@ func LoginGen(genQrFile bool) string {
 func LoginCheck(unikey string) (bool, string) {
 	for i := 0; i < 10; i++ {
 
-		resp, err := Client.R().SetBodyString(`{"key":"` + unikey + `","type":1}`).Post(`weapi/login/qrcode/client/login`)
+		resp, err := Client.R().SetBodyString(`{"key":"` + unikey + `","type":3}`).Post(`weapi/login/qrcode/client/login`)
 		if err != nil {
 			log.Println(err.Error())
 		}

@@ -38,6 +38,9 @@ type Lyric_s struct {
 	LyricMsg   string
 	lyricLines LyricLines_t
 	lyricCfg   cfg.CfgLrc_s
+
+	split   string
+	delayMs int64
 }
 
 func newLyricLine() *LyricLine_s {
@@ -52,6 +55,8 @@ func newLyricLine() *LyricLine_s {
 func NewLyric(cfg *cfg.CfgLrc_s) *Lyric_s {
 	rt := Lyric_s{}
 	rt.lyricCfg = *cfg
+	rt.split = cfg.Split
+	rt.delayMs = cast.ToInt64(cfg.Delayms)
 	return &rt
 }
 
@@ -262,37 +267,33 @@ func (it *Lyric_s) AppendLyricTextLine(value string, priority int) {
 }
 
 func (it *Lyric_s) GetLyrics() string {
-	//sort.Sort(it.lyricLines)
 	sort.Sort(sort.Reverse(it.lyricLines))
 	var build strings.Builder
 	preTimeline := ""
 	storedText := ""
+
 	for _, val := range it.lyricLines {
 		if it.lyricCfg.SkipEmpty && (val.text == "" || strings.ReplaceAll(val.text, " ", "") == "") {
 			continue
 		}
 		if it.lyricCfg.Style == 3 && !val.is_tag {
 			if preTimeline != val.GetTimeStringWithBrackets() {
-				//新的开始
 				if preTimeline != "" {
-					//前者有数据，先输出
 					build.WriteString(preTimeline)
 					build.WriteString(storedText)
 					build.WriteString("\n")
 				}
-				//存储新的开始
 				preTimeline = val.GetTimeStringWithBrackets()
 				storedText = val.text
 			} else {
-				//当前为同timeline下的其它行
-				storedText = storedText + it.lyricCfg.Split + val.text
+				storedText = storedText + it.split + val.text
 			}
 		} else {
 			build.WriteString(val.GetLyricLine())
 			build.WriteString("\n")
 		}
 	}
-	//导出最后一组
+
 	if it.lyricCfg.Style == 3 {
 		build.WriteString(preTimeline)
 		build.WriteString(storedText)
@@ -301,17 +302,25 @@ func (it *Lyric_s) GetLyrics() string {
 	return build.String()
 }
 
-/**
- * @description: 为指定priority的歌词行调整
- * @param {int} priority
- * @param {int64} ms
- * @return {*}
- */
 func (it *Lyric_s) DelayLyricLine(priority int, ms int64) {
 	for _, val := range it.lyricLines {
 		if val.getPriority() == priority {
 			val.adjustTimelineMs(ms)
 		}
+	}
+}
+
+func (it *Lyric_s) SetSplit(split string) {
+	it.split = split
+}
+
+func (it *Lyric_s) SetDelayMs(ms int64) {
+	it.delayMs = ms
+}
+
+func (it *Lyric_s) ApplyDelay() {
+	if it.delayMs != 0 {
+		it.DelayLyricLine(0, it.delayMs)
 	}
 }
 

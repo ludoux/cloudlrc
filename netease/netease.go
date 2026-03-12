@@ -42,12 +42,9 @@ func convertEncoding(s string, newEncoding string) []byte {
 	return []byte("")
 }
 
-/**
- * @description: Album 和 Playlist 都会调用此方法来获取歌词
- * @return {*}
- */
 func (musics NeteaseSingleMusics_t) fetchLrcsAsync() {
 	var wg sync.WaitGroup
+
 	p, _ := ants.NewPoolWithFunc(2, func(music_i interface{}) {
 		i := cast.ToInt(music_i)
 		if musics[i].needDownload {
@@ -68,19 +65,59 @@ func (musics NeteaseSingleMusics_t) fetchLrcsAsync() {
 	})
 	defer p.Release()
 	go responseController()
-	//startTime := time.Now()
+
 	for i := range musics {
 		wg.Add(1)
 		_ = p.Invoke(i)
 	}
 	wg.Wait()
-	//elapsedTime := time.Since(startTime) / time.Millisecond
-	//fmt.Printf("下载歌词总耗时: %dms\n", elapsedTime)
 }
 
 func DownloadSingleMusicLrc(id int64) {
 	cfg := cfg.GetCfgFile()
 	DownloadSingleMusicLrcWCfg(id, cfg)
+}
+
+func DownloadSingleMusicLrcWithConfig(id int64, transFirst bool, transDelay int64, split string) {
+	fileCfg := cfg.GetCfgFile()
+	lrcCfg := cfg.GetCfgLrc()
+
+	if transFirst {
+		lrcCfg.Style = 2
+	}
+	if split != "" {
+		lrcCfg.Split = split
+	}
+
+	nsm := newNeteaseSingleMusic(id)
+	if !nsm.genlyric {
+		fmt.Printf("歌曲 ID %d 无歌词，跳过下载\n", id)
+		return
+	}
+
+	nsm.SetLyricSplit(lrcCfg.Split)
+	nsm.SetLyricDelayMs(transDelay)
+
+	if transDelay != 0 {
+		nsm.ApplyLyricDelay()
+	}
+
+	aligntext_trackno := "%02d"
+
+	filename := fileCfg.Filename + "." + strings.ToLower(fileCfg.Format)
+	filename = strings.ReplaceAll(filename, "<TITLE>", nsm.title)
+	filename = strings.ReplaceAll(filename, "<AUTO_NO>", "1")
+	filename = strings.ReplaceAll(filename, "<DISC_NO>", cast.ToString(nsm.discNo))
+	filename = strings.ReplaceAll(filename, "<TRACK_NO>", fmt.Sprintf(aligntext_trackno, nsm.trackNo))
+	filename = strings.ReplaceAll(filename, "<ARTIST>", nsm.getArtistsStr())
+	filename = utils.ToSaveFilename(filename)
+
+	err := os.WriteFile(filename, convertEncoding(nsm.lyric.GetLyrics(), fileCfg.Encoding), 0666)
+	if err != nil {
+		log.Fatalf("写入歌词文件失败: 文件名=%s, 错误=%v\n", filename, err)
+	} else {
+		fmt.Printf("已生成: %s\n", filename)
+	}
 }
 
 func DownloadSingleMusicLrcWCfg(id int64, config *cfg.CfgFile_s) {
@@ -108,49 +145,116 @@ func DownloadSingleMusicLrcWCfg(id int64, config *cfg.CfgFile_s) {
 
 }
 
-func DownloadPlaylistLrc(id int64) {
-	cfg := cfg.GetCfgFile()
-	DownloadPlaylistLrcWCfg(id, cfg)
-}
-
-func DownloadPlaylistLrcWCfg(id int64, config *cfg.CfgFile_s) {
-	np := newNeteasePlaylist(id)
-	path := utils.ToSaveFilename(np.title)
+func downloadBatchMusics(musics NeteaseSingleMusics_t, collectionTitle string, fileCfg *cfg.CfgFile_s) {
+	path := utils.ToSaveFilename(collectionTitle)
 	os.MkdirAll(path, os.ModePerm)
-	fmt.Println("音乐总数:", len(np.musics))
+	fmt.Println("音乐总数:", len(musics))
 
-	np.musics.fetchLrcsAsync()
+	musics.fetchLrcsAsync()
 
-	aligncount_autono := len([]rune(cast.ToString(len(np.musics))))
+	aligncount_autono := len([]rune(cast.ToString(len(musics))))
 	if aligncount_autono == 1 {
 		aligncount_autono = 2
 	}
 	aligntext_autono := "%0" + cast.ToString(aligncount_autono) + "d"
 
-	aligncount_trackno := len([]rune(cast.ToString(len(np.musics))))
+	aligncount_trackno := len([]rune(cast.ToString(len(musics))))
 	if aligncount_trackno == 1 {
 		aligncount_trackno = 2
 	}
 	aligntext_trackno := "%02d"
 
-	for _, v := range np.musics {
+	for _, v := range musics {
 		if !v.genlyric {
-			//无需下载，continue
 			continue
 		}
 
-		filename := config.Filename + "." + strings.ToLower(config.Format)
+		filename := fileCfg.Filename + "." + strings.ToLower(fileCfg.Format)
 		filename = strings.ReplaceAll(filename, "<TITLE>", v.title)
 		filename = strings.ReplaceAll(filename, "<AUTO_NO>", fmt.Sprintf(aligntext_autono, v.listI+1))
 		filename = strings.ReplaceAll(filename, "<DISC_NO>", cast.ToString(v.discNo))
 		filename = strings.ReplaceAll(filename, "<TRACK_NO>", fmt.Sprintf(aligntext_trackno, v.trackNo))
 		filename = strings.ReplaceAll(filename, "<ARTIST>", v.getArtistsStr())
 		filename = utils.ToSaveFilename(filename)
-		err := os.WriteFile(path+"/"+filename, convertEncoding(v.lyric.GetLyrics(), config.Encoding), 0666)
+		err := os.WriteFile(path+"/"+filename, convertEncoding(v.lyric.GetLyrics(), fileCfg.Encoding), 0666)
 		if err != nil {
-			fmt.Println(err.Error())
+			fmt.Printf("写入文件失败: %s, 错误: %v\n", filename, err)
 		}
 	}
+}
+
+func downloadBatchMusicsWithConfig(musics NeteaseSingleMusics_t, collectionTitle string, fileCfg *cfg.CfgFile_s, lrcCfg *cfg.CfgLrc_s, transDelay int64) {
+	path := utils.ToSaveFilename(collectionTitle)
+	os.MkdirAll(path, os.ModePerm)
+	fmt.Println("音乐总数:", len(musics))
+
+	for _, v := range musics {
+		v.SetLyricSplit(lrcCfg.Split)
+		v.SetLyricDelayMs(transDelay)
+	}
+
+	musics.fetchLrcsAsync()
+
+	for _, v := range musics {
+		if transDelay != 0 {
+			v.ApplyLyricDelay()
+		}
+	}
+
+	aligncount_autono := len([]rune(cast.ToString(len(musics))))
+	if aligncount_autono == 1 {
+		aligncount_autono = 2
+	}
+	aligntext_autono := "%0" + cast.ToString(aligncount_autono) + "d"
+
+	aligncount_trackno := len([]rune(cast.ToString(len(musics))))
+	if aligncount_trackno == 1 {
+		aligncount_trackno = 2
+	}
+	aligntext_trackno := "%02d"
+
+	for _, v := range musics {
+		if !v.genlyric {
+			continue
+		}
+
+		filename := fileCfg.Filename + "." + strings.ToLower(fileCfg.Format)
+		filename = strings.ReplaceAll(filename, "<TITLE>", v.title)
+		filename = strings.ReplaceAll(filename, "<AUTO_NO>", fmt.Sprintf(aligntext_autono, v.listI+1))
+		filename = strings.ReplaceAll(filename, "<DISC_NO>", cast.ToString(v.discNo))
+		filename = strings.ReplaceAll(filename, "<TRACK_NO>", fmt.Sprintf(aligntext_trackno, v.trackNo))
+		filename = strings.ReplaceAll(filename, "<ARTIST>", v.getArtistsStr())
+		filename = utils.ToSaveFilename(filename)
+		err := os.WriteFile(path+"/"+filename, convertEncoding(v.lyric.GetLyrics(), fileCfg.Encoding), 0666)
+		if err != nil {
+			fmt.Printf("写入文件失败: %s, 错误: %v\n", filename, err)
+		}
+	}
+}
+
+func DownloadPlaylistLrc(id int64) {
+	cfg := cfg.GetCfgFile()
+	DownloadPlaylistLrcWCfg(id, cfg)
+}
+
+func DownloadPlaylistLrcWithConfig(id int64, transFirst bool, transDelay int64, split string) {
+	fileCfg := cfg.GetCfgFile()
+	lrcCfg := cfg.GetCfgLrc()
+
+	if transFirst {
+		lrcCfg.Style = 2
+	}
+	if split != "" {
+		lrcCfg.Split = split
+	}
+
+	np := newNeteasePlaylist(id)
+	downloadBatchMusicsWithConfig(np.musics, np.title, fileCfg, lrcCfg, transDelay)
+}
+
+func DownloadPlaylistLrcWCfg(id int64, config *cfg.CfgFile_s) {
+	np := newNeteasePlaylist(id)
+	downloadBatchMusics(np.musics, np.title, config)
 }
 
 func DownloadAlbumLrc(id int64) {
@@ -158,41 +262,22 @@ func DownloadAlbumLrc(id int64) {
 	DownloadAlbumLrcWCfg(id, cfg)
 }
 
+func DownloadAlbumLrcWithConfig(id int64, transFirst bool, transDelay int64, split string) {
+	fileCfg := cfg.GetCfgFile()
+	lrcCfg := cfg.GetCfgLrc()
+
+	if transFirst {
+		lrcCfg.Style = 2
+	}
+	if split != "" {
+		lrcCfg.Split = split
+	}
+
+	np := newNeteaseAlbum(id)
+	downloadBatchMusicsWithConfig(np.musics, np.title, fileCfg, lrcCfg, transDelay)
+}
+
 func DownloadAlbumLrcWCfg(id int64, config *cfg.CfgFile_s) {
 	np := newNeteaseAlbum(id)
-	path := utils.ToSaveFilename(np.title)
-	os.MkdirAll(path, os.ModePerm)
-	fmt.Println("音乐总数:", len(np.musics))
-
-	np.musics.fetchLrcsAsync()
-
-	aligncount_autono := len([]rune(cast.ToString(len(np.musics))))
-	if aligncount_autono == 1 {
-		aligncount_autono = 2
-	}
-	aligntext_autono := "%0" + cast.ToString(aligncount_autono) + "d"
-
-	aligncount_trackno := len([]rune(cast.ToString(len(np.musics))))
-	if aligncount_trackno == 1 {
-		aligncount_trackno = 2
-	}
-	aligntext_trackno := "%02d"
-	for _, v := range np.musics {
-		if !v.genlyric {
-			//无需下载，continue
-			continue
-		}
-
-		filename := config.Filename + "." + strings.ToLower(config.Format)
-		filename = strings.ReplaceAll(filename, "<TITLE>", v.title)
-		filename = strings.ReplaceAll(filename, "<AUTO_NO>", fmt.Sprintf(aligntext_autono, v.listI+1))
-		filename = strings.ReplaceAll(filename, "<DISC_NO>", cast.ToString(v.discNo))
-		filename = strings.ReplaceAll(filename, "<TRACK_NO>", fmt.Sprintf(aligntext_trackno, v.trackNo))
-		filename = strings.ReplaceAll(filename, "<ARTIST>", v.getArtistsStr())
-		filename = utils.ToSaveFilename(filename)
-		err := os.WriteFile(path+"/"+filename, convertEncoding(v.lyric.GetLyrics(), config.Encoding), 0666)
-		if err != nil {
-			fmt.Println(err.Error())
-		}
-	}
+	downloadBatchMusics(np.musics, np.title, config)
 }

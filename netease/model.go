@@ -159,9 +159,20 @@ func (it *NeteaseSingleMusic_s) fetchLrc() error {
 	return nil
 }
 
-// 调换原文和翻译的优先级
 func (it *NeteaseSingleMusic_s) ChangeTransOrder() {
 	it.lyric.SwapPriority(0, 1)
+}
+
+func (it *NeteaseSingleMusic_s) SetLyricSplit(split string) {
+	it.lyric.SetSplit(split)
+}
+
+func (it *NeteaseSingleMusic_s) SetLyricDelayMs(delay int64) {
+	it.lyric.SetDelayMs(delay)
+}
+
+func (it *NeteaseSingleMusic_s) ApplyLyricDelay() {
+	it.lyric.ApplyDelay()
 }
 
 // 列表大相关
