@@ -9,6 +9,7 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"math/big"
@@ -20,6 +21,7 @@ const (
 	nonce          = "0CoJUm6Qyw8W8jud"
 	pubKey         = "010001"
 	iv             = "0102030405060708"
+	eapiKey        = "e82ckenh8dichen8"
 	keys    string = `abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789`
 )
 
@@ -159,4 +161,61 @@ func pKCS5UnPadding(originData []byte) []byte {
 	length := len(originData)
 	unPadding := int(originData[length-1])
 	return originData[:(length - unPadding)]
+}
+
+func generateKey(key []byte) (genKey []byte) {
+	genKey = make([]byte, 16)
+	copy(genKey, key)
+	for i := 16; i < len(key); {
+		for j := 0; j < 16 && i < len(key); j, i = j+1, i+1 {
+			genKey[j] ^= key[i]
+		}
+	}
+	return genKey
+}
+
+func encryptECB(data, keyStr string) (encrypted []byte) {
+	origData := []byte(data)
+	key := []byte(keyStr)
+	cipher, _ := aes.NewCipher(generateKey(key))
+	length := (len(origData) + aes.BlockSize) / aes.BlockSize
+	plain := make([]byte, length*aes.BlockSize)
+	copy(plain, origData)
+	pad := byte(len(plain) - len(origData))
+	for i := len(origData); i < len(plain); i++ {
+		plain[i] = pad
+	}
+	encrypted = make([]byte, len(plain))
+	for bs, be := 0, cipher.BlockSize(); bs <= len(origData); bs, be = bs+cipher.BlockSize(), be+cipher.BlockSize() {
+		cipher.Encrypt(encrypted[bs:be], plain[bs:be])
+	}
+	return encrypted
+}
+
+func decryptECB(encrypted []byte, keyStr string) (decrypted []byte) {
+	key := []byte(keyStr)
+	cipher, _ := aes.NewCipher(generateKey(key))
+	decrypted = make([]byte, len(encrypted))
+	for bs, be := 0, cipher.BlockSize(); bs < len(encrypted); bs, be = bs+cipher.BlockSize(), be+cipher.BlockSize() {
+		cipher.Decrypt(decrypted[bs:be], encrypted[bs:be])
+	}
+	trim := 0
+	if len(decrypted) > 0 {
+		trim = len(decrypted) - int(decrypted[len(decrypted)-1])
+	}
+	return decrypted[:trim]
+}
+
+func eapiEncrypt(data string) (encrypted string) {
+	encryptedData := encryptECB(data, eapiKey)
+	return fmt.Sprintf("%X", encryptedData)
+}
+
+func eapiDecrypt(encrypted string) (decrypted string, err error) {
+	encryptedData, err := hex.DecodeString(encrypted)
+	if err != nil {
+		return "", err
+	}
+	decryptedData := decryptECB(encryptedData, eapiKey)
+	return string(decryptedData), nil
 }
